@@ -6,8 +6,7 @@
   "mixins": [
     "BlockSubLevelLiftProviderMixin",
     "LevelChunkMixin",
-    "ServerSubLevelMixin",
-    "SubLevelPhysicsSystemMixin"
+    "ServerSubLevelMixin"
   ],
   "client": [
   ],
