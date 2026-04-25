@@ -1,6 +1,5 @@
 package org.boberchik342.CreateStormday.mixin;
 
-import com.mojang.logging.LogUtils;
 import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import org.joml.Vector3d;
@@ -25,7 +24,6 @@ public abstract class ServerSubLevelMixin {
         if (wakeUp) {
             createStormday$lastWakeUpForce.set(impulse);
             createStormday$lastWakeUpTorque.set(torque);
-            LogUtils.getLogger().info("Woken Up Object");
         }
         instance.applyLinearAndAngularImpulse(impulse, torque, wakeUp);
     }
