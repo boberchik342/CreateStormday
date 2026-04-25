@@ -1,19 +1,24 @@
 package org.boberchik342.CreateStormday;
 
 import com.mojang.logging.LogUtils;
+import dev.ryanhcode.sable.api.block.propeller.BlockEntityPropeller;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.food.FoodProperties;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraft.world.item.Item;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -23,98 +28,188 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import net.neoforged.neoforge.registries.DeferredBlock;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.DeferredItem;
-import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.gui.ConfigurationScreen;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.slf4j.Logger;
 
-// The value here should match an entry in the META-INF/neoforge.mods.toml file
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 @Mod(CreateStormday.MODID)
 public class CreateStormday {
-    // Define mod id in a common place for everything to reference
     public static final String MODID = "create_stormday";
-    // Directly reference a slf4j logger
     private static final Logger LOGGER = LogUtils.getLogger();
-    // Create a Deferred Register to hold Blocks which will all be registered under the "create_stormday" namespace
-    public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
-    // Create a Deferred Register to hold Items which will all be registered under the "create_stormday" namespace
-    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
-    // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "create_stormday" namespace
-    public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
-    // Creates a new Block with the id "create_stormday:example_block", combining the namespace and path
-    public static final DeferredBlock<Block> EXAMPLE_BLOCK = BLOCKS.registerSimpleBlock("example_block", BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
-    // Creates a new BlockItem with the id "create_stormday:example_block", combining the namespace and path
-    public static final DeferredItem<BlockItem> EXAMPLE_BLOCK_ITEM = ITEMS.registerSimpleBlockItem("example_block", EXAMPLE_BLOCK);
-
-    // Creates a new food item with the id "create_stormday:example_id", nutrition 1 and saturation 2
-    public static final DeferredItem<Item> EXAMPLE_ITEM = ITEMS.registerSimpleItem("example_item", new Item.Properties().food(new FoodProperties.Builder().alwaysEdible().nutrition(1).saturationModifier(2f).build()));
-
-    // Creates a creative tab with the id "create_stormday:example_tab" for the example item, that is placed after the combat tab
-    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("example_tab", () -> CreativeModeTab.builder().title(Component.translatable("itemGroup.create_stormday")).withTabsBefore(CreativeModeTabs.COMBAT).icon(() -> EXAMPLE_ITEM.get().getDefaultInstance()).displayItems((parameters, output) -> {
-        output.accept(EXAMPLE_ITEM.get()); // Add the example item to the tab. For your own tabs, this method is preferred over the event
-    }).build());
-
-    // The constructor for the mod class is the first code that is run when your mod is loaded.
-    // FML will recognize some parameter types like IEventBus or ModContainer and pass them in automatically.
     public CreateStormday(IEventBus modEventBus, ModContainer modContainer) {
-        // Register the commonSetup method for modloading
-        modEventBus.addListener(this::commonSetup);
-
-        // Register the Deferred Register to the mod event bus so blocks get registered
-        BLOCKS.register(modEventBus);
-        // Register the Deferred Register to the mod event bus so items get registered
-        ITEMS.register(modEventBus);
-        // Register the Deferred Register to the mod event bus so tabs get registered
-        CREATIVE_MODE_TABS.register(modEventBus);
-
-        // Register ourselves for server and other game events we are interested in.
-        // Note that this is necessary if and only if we want *this* class (CreateStormday) to respond directly to events.
-        // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
-        NeoForge.EVENT_BUS.register(this);
-
-        // Register the item to a creative tab
-        modEventBus.addListener(this::addCreative);
-
-        // Register our mod's ModConfigSpec so that FML can create and load the config file for us
+//        NeoForge.EVENT_BUS.register(this);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        modContainer.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
 
-    private void commonSetup(final FMLCommonSetupEvent event) {
-        // Some common setup code
-        LOGGER.info("HELLO FROM COMMON SETUP");
-
-        if (Config.logDirtBlock) LOGGER.info("DIRT BLOCK >> {}", BuiltInRegistries.BLOCK.getKey(Blocks.DIRT));
-
-        LOGGER.info(Config.magicNumberIntroduction + Config.magicNumber);
-
-        Config.items.forEach((item) -> LOGGER.info("ITEM >> {}", item.toString()));
+    public static ResourceLocation id(String name) {
+        return ResourceLocation.fromNamespaceAndPath(CreateStormday.MODID, name);
     }
 
-    // Add the example block item to the building blocks tab
-    private void addCreative(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) event.accept(EXAMPLE_BLOCK_ITEM);
-    }
-
-    // You can use SubscribeEvent and let the Event Bus discover methods to call
-    @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
-        // Do something when the server starts
-        LOGGER.info("HELLO from server starting");
-    }
-
-    // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
-    @EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
     public static class ClientModEvents {
         @SubscribeEvent
+        public static void onCommonSetup(FMLCommonSetupEvent event) {
+            LOGGER.info("Wind breaks crops: {}", Config.windBreaksCrops);
+        }
+        @SubscribeEvent
+        public static void onServerPreTick(ServerTickEvent.Pre event) {
+            for (var level : event.getServer().getAllLevels()) {
+                WindSystem system = WindSystem.get(level);
+                if (system instanceof ServerWindSystem serverSystem) {
+                    serverSystem.tick(level);
+                }
+                if (system.getWind().x > 10 && Config.windBreaksCrops) {
+                    List<BlockPos> snapshot = new ArrayList<>();
+
+                    for (Set<BlockPos> set : system.crops.values()) {
+                        snapshot.addAll(set);
+                    }
+                    for (var pos : snapshot) {
+                        if (!system.isBlockExposed(level, pos)) continue;
+                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 0);
+                    }
+                }
+            }
+
+        }
+
+        @SubscribeEvent
+        public static void onChunkLoad(ChunkEvent.Load event) {
+            if (!(event.getLevel() instanceof ServerLevel level)) return;
+            if (!(event.getChunk() instanceof LevelChunk chunk)) return;
+
+            var system = WindSystem.get(level);
+            Set<BlockPos> crops = system.crops.computeIfAbsent(chunk, k -> new HashSet<>());
+
+            int minY = chunk.getMinBuildHeight();
+            int maxY = chunk.getMaxBuildHeight();
+
+            ChunkPos cp = chunk.getPos();
+
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int y = minY; y < maxY; y++) {
+
+                        BlockPos pos = new BlockPos(
+                                cp.getMinBlockX() + x,
+                                y,
+                                cp.getMinBlockZ() + z
+                        );
+
+                        BlockState state = chunk.getBlockState(pos);
+
+                        if (state.getBlock() instanceof CropBlock) {
+                            LOGGER.info("found crop");
+                            crops.add(pos);
+                        }
+                    }
+                }
+            }
+
+        }
+
+        @SubscribeEvent
+        public static void onClientTick(ClientTickEvent.Post event) {
+            if (Minecraft.getInstance().level == null) return;
+            var system = WindSystem.get(Minecraft.getInstance().level);
+            Vec2 wind = system.getWind();
+//            LOGGER.info("Wind is {} {}", wind.x, wind.y);
+            spawnWindParticles(Minecraft.getInstance());
+        }
+        @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
-            // Some client setup code
-            LOGGER.info("HELLO FROM CLIENT SETUP");
-            LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+
+        }
+        @SubscribeEvent
+        public static void register(final RegisterPayloadHandlersEvent event) {
+            final PayloadRegistrar registrar = event.registrar("1");
+            registrar.commonToClient(
+                WindPacket.TYPE,
+                WindPacket.CODEC,
+                ClientPayloadHandler::handleWindPacket
+            );
+        }
+
+        @SubscribeEvent
+        public static void onRender(RenderGuiEvent.Post event) {
+            float strength = WindSystem.get(Minecraft.getInstance().level).getWind().x;
+            event.getGuiGraphics().setColor(1, 1, 1, 1);
+            event.getGuiGraphics().drawString(Minecraft.getInstance().font, String.valueOf(strength), 20, 20, 0xFFFFFFFF);
+        }
+
+        @SubscribeEvent
+        public static void onRegisterCommands(RegisterCommandsEvent event) {
+            WindCommand.register(event.getDispatcher());
+        }
+    }
+
+    private static void spawnWindParticles(Minecraft mc) {
+        if (mc.isPaused()) return;
+
+        ClientLevel level = mc.level;
+
+        if (mc.level == null || mc.player == null) return;
+
+        Vec2 wind = WindSystem.get(level).getWind();
+
+        Vec3 playerPos = mc.player.position();
+
+        float direction = wind.y;
+        float strength = wind.x;
+
+        double vx = Math.cos(direction) * strength;
+        double vz = Math.sin(direction) * strength;
+        int volume = Config.windParticleSpawnAreaSize * Config.windParticleSpawnAreaSize * Config.windParticleSpawnAreaSize;
+        for (int i = 0; i < Math.min(Math.pow(Math.max(strength - 0.5, 0), 1.5) * volume / 2000, 1000); i++) {
+            double x = playerPos.x + (level.random.nextDouble() - 0.5) * 200;
+            double y = playerPos.y + (level.random.nextDouble() - 0.5) * 200;
+            double z = playerPos.z + (level.random.nextDouble() - 0.5) * 200;
+
+            double jitterX = (level.random.nextDouble() - 0.5) * 0.2;
+            double jitterZ = (level.random.nextDouble() - 0.5) * 0.2;
+
+            level.addParticle(
+                    ParticleTypes.CLOUD,
+                    x, y, z,
+                    vx + jitterX,
+                    0,
+                    vz + jitterZ
+            );
+        }
+
+        int size = 20;
+        volume = (int) Math.pow(size * 2 + 1, 3);
+        for (int i = 0; i < volume * strength / 64; i++) {
+            BlockPos pos = new BlockPos(
+                    (int) playerPos.x + level.random.nextInt(1 + 2 * size) - size,
+                    (int) playerPos.y + level.random.nextInt(1 + 2 * size) - size,
+                    (int) playerPos.z + level.random.nextInt(1 + 2 * size) - size
+            );
+            if (WindSystem.get(level).isBlockExposed(level, pos)) {
+                BlockState state = level.getBlockState(pos);
+                if (state.isAir()) continue;
+                level.addParticle(
+                        new BlockParticleOption(ParticleTypes.BLOCK, state),
+                        pos.getX() + level.random.nextDouble(),
+                        pos.getY() + 1,
+                        pos.getZ() + level.random.nextDouble(),
+                        vx * 3, 10, vz * 3
+                );
+            }
         }
     }
 }

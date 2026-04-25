@@ -4,6 +4,10 @@
   "package": "org.boberchik342.CreateStormday.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "BlockSubLevelLiftProviderMixin",
+    "LevelChunkMixin",
+    "ServerSubLevelMixin",
+    "SubLevelPhysicsSystemMixin"
   ],
   "client": [
   ],

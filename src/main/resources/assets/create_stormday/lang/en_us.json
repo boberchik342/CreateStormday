@@ -1,5 +1,4 @@
 {
-  "itemGroup.create_stormday": "Example Mod Tab",
-  "block.create_stormday.example_block": "Example Block",
-  "item.create_stormday.example_item": "Example Item"
+  "create_stormday.configuration.wind_breaks_crops": "Wind breaks crops",
+  "create_stormday.configuration.wind_particle_spawn_area_size": "Wind particle spawn area size"
 }

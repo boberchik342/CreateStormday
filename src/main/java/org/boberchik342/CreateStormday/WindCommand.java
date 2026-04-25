@@ -1,11 +1,9 @@
-package org.boberchik342.CreateStormday.mixin;
+package org.boberchik342.CreateStormday;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import org.boberchik342.CreateStormday.ServerWindSystem;
-import org.boberchik342.CreateStormday.WindSystem;
 
 public class WindCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
