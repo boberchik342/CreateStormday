@@ -181,7 +181,7 @@ public class CreateStormday {
             raycasts = WindSystem.windComputations;
             WindSystem.windComputations = 0;
             if (Minecraft.getInstance().level == null) return;
-            var system = WindSystem.get(Minecraft.getInstance().level);
+//            var system = WindSystem.get(Minecraft.getInstance().level);
 //            Vec2 wind = system.getWind();
 //            LOGGER.info("Wind is {} {}", wind.x, wind.y);
             spawnWindParticles(Minecraft.getInstance());
