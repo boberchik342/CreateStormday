@@ -9,7 +9,6 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
 public class WindDebugRenderer implements BlockEntityRenderer<WindDebugBlockEntity> {
@@ -52,14 +51,13 @@ public class WindDebugRenderer implements BlockEntityRenderer<WindDebugBlockEnti
             float b = 1.0f - r;
 
             switch (dir) {
-                case NORTH -> { // Z-
-                    quad(vc, m, r, g, b, dir.getNormal(),
-                            min, min, min,
-                            max, min, min,
-                            max, max, min,
-                            min, max, min
-                    );
-                }
+                case NORTH -> // Z-
+                        quad(vc, m, r, g, b, dir.getNormal(),
+                                min, min, min,
+                                max, min, min,
+                                max, max, min,
+                                min, max, min
+                        );
                 case SOUTH -> { // Z+
                     quad(vc, m, r, g, b, dir.getNormal(),
                             min, min, max,
@@ -76,30 +74,27 @@ public class WindDebugRenderer implements BlockEntityRenderer<WindDebugBlockEnti
                             min, min, max
                     );
                 }
-                case EAST -> { // X+
-                    quad(vc, m, r, g, b, dir.getNormal(),
-                            max, min, min,
-                            max, min, max,
-                            max, max, max,
-                            max, max, min
-                    );
-                }
-                case DOWN -> { // Y-
-                    quad(vc, m, r, g, b, dir.getNormal(),
-                            min, min, min,
-                            min, min, max,
-                            max, min, max,
-                            max, min, min
-                    );
-                }
-                case UP -> { // Y+
-                    quad(vc, m, r, g, b, dir.getNormal(),
-                            min, max, min,
-                            max, max, min,
-                            max, max, max,
-                            min, max, max
-                    );
-                }
+                case EAST -> // X+
+                        quad(vc, m, r, g, b, dir.getNormal(),
+                                max, min, min,
+                                max, min, max,
+                                max, max, max,
+                                max, max, min
+                        );
+                case DOWN -> // Y-
+                        quad(vc, m, r, g, b, dir.getNormal(),
+                                min, min, min,
+                                min, min, max,
+                                max, min, max,
+                                max, min, min
+                        );
+                case UP -> // Y+
+                        quad(vc, m, r, g, b, dir.getNormal(),
+                                min, max, min,
+                                max, max, min,
+                                max, max, max,
+                                min, max, max
+                        );
             }
         }
     }
