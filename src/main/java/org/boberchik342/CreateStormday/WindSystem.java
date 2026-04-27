@@ -16,7 +16,7 @@ public abstract class WindSystem {
             this.created = created;
             this.value = value;
         }
-        public long created = 0;
+        public long created;
         public double value;
     }
     public static int windComputations = 0;
@@ -135,10 +135,6 @@ public abstract class WindSystem {
             }
         }
         return computeDirectWindExposure(level, pos) ? 1 : 0;
-    }
-
-    public boolean getDirectWindExposure(Level level, BlockPos pos) {
-        return getDirectWindExposureD(level, pos) == 1;
     }
 
     private static double interpolate(double a, double b, double t) {

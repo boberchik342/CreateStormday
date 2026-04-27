@@ -9,18 +9,19 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 
 public class WindDebugRenderer implements BlockEntityRenderer<WindDebugBlockEntity> {
 
-    public WindDebugRenderer(BlockEntityRendererProvider.Context ctx) {}
+    public WindDebugRenderer(BlockEntityRendererProvider.Context ignoredCtx) {}
 
     @Override
     public void render(
             WindDebugBlockEntity be,
             float partialTicks,
-            PoseStack poseStack,
-            MultiBufferSource buffer,
+            @NotNull PoseStack poseStack,
+            @NotNull MultiBufferSource buffer,
             int light,
             int overlay
     ) {
@@ -58,22 +59,20 @@ public class WindDebugRenderer implements BlockEntityRenderer<WindDebugBlockEnti
                                 max, max, min,
                                 min, max, min
                         );
-                case SOUTH -> { // Z+
-                    quad(vc, m, r, g, b, dir.getNormal(),
-                            min, min, max,
-                            min, max, max,
-                            max, max, max,
-                            max, min, max
-                    );
-                }
-                case WEST -> { // X-
-                    quad(vc, m, r, g, b, dir.getNormal(),
-                            min, min, min,
-                            min, max, min,
-                            min, max, max,
-                            min, min, max
-                    );
-                }
+                case SOUTH -> // Z+
+                        quad(vc, m, r, g, b, dir.getNormal(),
+                                min, min, max,
+                                min, max, max,
+                                max, max, max,
+                                max, min, max
+                        );
+                case WEST -> // X-
+                        quad(vc, m, r, g, b, dir.getNormal(),
+                                min, min, min,
+                                min, max, min,
+                                min, max, max,
+                                min, min, max
+                        );
                 case EAST -> // X+
                         quad(vc, m, r, g, b, dir.getNormal(),
                                 max, min, min,

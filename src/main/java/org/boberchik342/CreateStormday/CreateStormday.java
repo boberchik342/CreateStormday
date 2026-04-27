@@ -182,7 +182,7 @@ public class CreateStormday {
             WindSystem.windComputations = 0;
             if (Minecraft.getInstance().level == null) return;
             var system = WindSystem.get(Minecraft.getInstance().level);
-            Vec2 wind = system.getWind();
+//            Vec2 wind = system.getWind();
 //            LOGGER.info("Wind is {} {}", wind.x, wind.y);
             spawnWindParticles(Minecraft.getInstance());
         }
