@@ -1,6 +1,5 @@
-package org.boberchik342.CreateStormday;
+package org.boberchik342.CreateStormday.wind;
 
-import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec2;
 

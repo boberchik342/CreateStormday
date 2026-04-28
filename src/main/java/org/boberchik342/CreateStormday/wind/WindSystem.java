@@ -1,8 +1,9 @@
-package org.boberchik342.CreateStormday;
+package org.boberchik342.CreateStormday.wind;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec2;
@@ -117,12 +118,12 @@ public abstract class WindSystem {
         for (int t = 0; t <= c; t++) {
             BlockPos pos = a.offset(dir.multiply(t));
             BlockState s = level.getBlockState(pos);
-            if (!s.isAir()) solidsA++;
+            if (!isBlockWindPassable(s)) solidsA++;
         }
         for (int t = c; t <= b; t++) {
             BlockPos pos = a.offset(dir.multiply(t));
             BlockState s = level.getBlockState(pos);
-            if (!s.isAir()) solidsB++;
+            if (!isBlockWindPassable(s)) solidsB++;
         }
         if (solidsA > 0 && solidsB > 0) {
             return (double) solidsA / (solidsA + solidsB);
@@ -154,7 +155,7 @@ public abstract class WindSystem {
                 break;
             }
             BlockState state = level.getBlockState(bPos);
-            if (!state.isAir()) {
+            if (!isBlockWindPassable(state)) {
                 hit = true;
                 break;
             }
@@ -206,5 +207,9 @@ public abstract class WindSystem {
 
     private static double interpolate(double a, double b, double t) {
         return a * (1 - t) + b * t;
+    }
+
+    private static boolean isBlockWindPassable(BlockState state) {
+        return state.isAir() || state.getBlock() instanceof CropBlock;
     }
 }

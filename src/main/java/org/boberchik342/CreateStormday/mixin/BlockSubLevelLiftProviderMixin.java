@@ -1,11 +1,9 @@
 package org.boberchik342.CreateStormday.mixin;
 
-import com.mojang.logging.LogUtils;
 import dev.ryanhcode.sable.api.block.BlockSubLevelLiftProvider;
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
-import jdk.jfr.StackTrace;
-import org.boberchik342.CreateStormday.WindSystem;
+import org.boberchik342.CreateStormday.wind.WindSystem;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
 import org.spongepowered.asm.mixin.Mixin;

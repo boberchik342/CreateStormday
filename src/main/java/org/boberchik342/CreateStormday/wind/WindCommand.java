@@ -1,4 +1,4 @@
-package org.boberchik342.CreateStormday;
+package org.boberchik342.CreateStormday.wind;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.FloatArgumentType;

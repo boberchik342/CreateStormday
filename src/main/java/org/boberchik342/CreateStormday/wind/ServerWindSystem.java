@@ -1,4 +1,4 @@
-package org.boberchik342.CreateStormday;
+package org.boberchik342.CreateStormday.wind;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.MinecraftServer;
