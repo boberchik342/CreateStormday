@@ -12,13 +12,13 @@ import org.joml.Vector3d;
 import java.util.*;
 
 public abstract class WindSystem {
-    public static class WindEntry {
-        public WindEntry(long created, double value) {
+    public static class WindEntry<T> {
+        public WindEntry(long created, T value) {
             this.created = created;
             this.value = value;
         }
         public long created;
-        public double value;
+        public T value;
     }
     public static int windComputations = 0;
     public static final int sampleInterval = 4;
@@ -34,7 +34,9 @@ public abstract class WindSystem {
     }
 
     public final WeakHashMap<LevelChunk, Set<BlockPos>> crops = new WeakHashMap<>();
-    public final WeakHashMap<LevelChunk, Map<BlockPos, WindEntry>> directWindExposureCache = new WeakHashMap<>();
+    public final WeakHashMap<LevelChunk, Map<BlockPos, WindEntry<Boolean>>> directWindExposureCache = new WeakHashMap<>();
+    public final WeakHashMap<LevelChunk, Map<BlockPos, WindEntry<Double>>> interpolatedWindExposureCache = new WeakHashMap<>();
+
 
     protected float strength = 0;
     protected float direction = 0;
@@ -43,7 +45,16 @@ public abstract class WindSystem {
         windSystems.put(level, this);
     }
 
-    public double getBlockWindExposure(Level level, BlockPos pos) {
+    public WindEntry<Double> getBlockWindExposure(Level level, BlockPos pos) {
+        if (level.isLoaded(pos)) {
+            Map<BlockPos, WindEntry<Double>> directExposure = interpolatedWindExposureCache.get((LevelChunk) level.getChunk(pos));
+            if (directExposure != null) {
+                WindEntry<Double> exposed = directExposure.get(pos);
+                if (exposed != null && level.getGameTime() - exposed.created < 40) {
+                    return exposed;
+                }
+            }
+        }
         BlockPos origin = new BlockPos(Math.floorDiv(pos.getX(), sampleInterval) * sampleInterval, Math.floorDiv(pos.getY(), sampleInterval) * sampleInterval, Math.floorDiv(pos.getZ(), sampleInterval) * sampleInterval);
         BlockPos b000 = origin;
         BlockPos b001 = new BlockPos(origin.getX(), origin.getY(), origin.getZ() + sampleInterval);
@@ -53,14 +64,27 @@ public abstract class WindSystem {
         BlockPos b101 = new BlockPos(origin.getX() + sampleInterval, origin.getY(), origin.getZ() + sampleInterval);
         BlockPos b110 = new BlockPos(origin.getX() + sampleInterval, origin.getY() + sampleInterval, origin.getZ());
         BlockPos b111 = new BlockPos(origin.getX() + sampleInterval, origin.getY() + sampleInterval, origin.getZ() + sampleInterval);
-        double e000 = getDirectWindExposureD(level, b000);
-        double e001 = getDirectWindExposureD(level, b001);
-        double e010 = getDirectWindExposureD(level, b010);
-        double e011 = getDirectWindExposureD(level, b011);
-        double e100 = getDirectWindExposureD(level, b100);
-        double e101 = getDirectWindExposureD(level, b101);
-        double e110 = getDirectWindExposureD(level, b110);
-        double e111 = getDirectWindExposureD(level, b111);
+        WindEntry<Boolean> e000 = getDirectWindExposure(level, b000);
+        WindEntry<Boolean> e001 = getDirectWindExposure(level, b001);
+        WindEntry<Boolean> e010 = getDirectWindExposure(level, b010);
+        WindEntry<Boolean> e011 = getDirectWindExposure(level, b011);
+        WindEntry<Boolean> e100 = getDirectWindExposure(level, b100);
+        WindEntry<Boolean> e101 = getDirectWindExposure(level, b101);
+        WindEntry<Boolean> e110 = getDirectWindExposure(level, b110);
+        WindEntry<Boolean> e111 = getDirectWindExposure(level, b111);
+
+        long[] times = {
+                e000.created,
+                e001.created,
+                e010.created,
+                e011.created,
+                e100.created,
+                e101.created,
+                e110.created,
+                e111.created,
+        };
+        long earliestRaycast = Arrays.stream(times).min().orElse(level.getGameTime());
+
         int localX = Math.floorMod(pos.getX(), sampleInterval);
         int localY = Math.floorMod(pos.getY(), sampleInterval);
         int localZ = Math.floorMod(pos.getZ(), sampleInterval);
@@ -71,13 +95,18 @@ public abstract class WindSystem {
         double tY0 = getT(level, new BlockPos(pos.getX(), b000.getY(), b000.getZ()), sampleInterval, new Vec3i(0, 1, 0), localY);
         double tY1 = getT(level, new BlockPos(pos.getX(), b001.getY(), b001.getZ()), sampleInterval, new Vec3i(0, 1, 0), localY);
         double tZ = getT(level, new BlockPos(pos.getX(), pos.getY(), b000.getZ()), sampleInterval, new Vec3i(0, 0, 1), localZ);
-        double e00 = interpolate(e000, e100, tX00);
-        double e01 = interpolate(e001, e101, tX01);
-        double e10 = interpolate(e010, e110, tX10);
-        double e11 = interpolate(e011, e111, tX11);
+        double e00 = interpolate(e000.value ? 1 : 0, e100.value ? 1 : 0, tX00);
+        double e01 = interpolate(e001.value ? 1 : 0, e101.value ? 1 : 0, tX01);
+        double e10 = interpolate(e010.value ? 1 : 0, e110.value ? 1 : 0, tX10);
+        double e11 = interpolate(e011.value ? 1 : 0, e111.value ? 1 : 0, tX11);
         double e0 = interpolate(e00, e10, tY0);
         double e1 = interpolate(e01, e11, tY1);
-        return interpolate(e0, e1, tZ);
+        WindEntry<Double> entry = new WindEntry<>(earliestRaycast, interpolate(e0, e1, tZ));
+        if (level.isLoaded(pos)) {
+            Map<BlockPos, WindEntry<Double>> directExposure = interpolatedWindExposureCache.computeIfAbsent((LevelChunk) level.getChunk(pos), k -> new HashMap<>());
+            directExposure.put(pos, entry);
+        }
+        return entry;
     }
 
     public abstract Vec2 getWind();
@@ -151,27 +180,28 @@ public abstract class WindSystem {
                 bPos = new BlockPos(bPos.getX(), bPos.getY(), bPos.getZ() + (dir.z > 0 ? 1 : -1));
             }
         }
-        if (level.isLoaded(pos)) {
-            Map<BlockPos, WindEntry> directExposure = directWindExposureCache.computeIfAbsent((LevelChunk) level.getChunk(pos), k -> new HashMap<>());
-            directExposure.put(pos, new WindEntry(level.getGameTime(), hit ? 0 : 1));
-        }
 //        LogUtils.getLogger().info("Computed wind");
         windComputations++;
         return !hit;
     }
 
-    public double getDirectWindExposureD(Level level, BlockPos pos) {
+    public WindEntry<Boolean> getDirectWindExposure(Level level, BlockPos pos) {
         if (level.isLoaded(pos)) {
-            Map<BlockPos, WindEntry> directExposure = directWindExposureCache.get((LevelChunk) level.getChunk(pos));
+            Map<BlockPos, WindEntry<Boolean>> directExposure = directWindExposureCache.get((LevelChunk) level.getChunk(pos));
             if (directExposure != null) {
-                WindEntry exposed = directExposure.get(pos);
+                WindEntry<Boolean> exposed = directExposure.get(pos);
                 if (exposed != null && level.getGameTime() - exposed.created < 40) {
-//                    LogUtils.getLogger().info("Cache hitttttt!!!!!!!");
-                    return exposed.value;
+                    return exposed;
                 }
             }
         }
-        return computeDirectWindExposure(level, pos) ? 1 : 0;
+        boolean hit = computeDirectWindExposure(level, pos);
+        WindEntry<Boolean> entry = new WindEntry<>(level.getGameTime(), hit);
+        if (level.isLoaded(pos)) {
+            Map<BlockPos, WindEntry<Boolean>> directExposure = directWindExposureCache.computeIfAbsent((LevelChunk) level.getChunk(pos), k -> new HashMap<>());
+            directExposure.put(pos, entry);
+        }
+        return entry;
     }
 
     private static double interpolate(double a, double b, double t) {

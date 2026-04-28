@@ -15,6 +15,6 @@ public class WindDebugBlockEntity extends BlockEntity {
     }
 
     public double getExposure(Level level, Direction dir) {
-        return WindSystem.get(level).getBlockWindExposure(level, worldPosition.offset(dir.getNormal()));
+        return WindSystem.get(level).getBlockWindExposure(level, worldPosition.offset(dir.getNormal())).value;
     }
 }

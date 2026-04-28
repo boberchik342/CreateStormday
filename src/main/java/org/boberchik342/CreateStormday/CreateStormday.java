@@ -47,7 +47,6 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import org.boberchik342.CreateStormday.debug.WindDebugBlock;
 import org.boberchik342.CreateStormday.debug.WindDebugBlockEntity;
 import org.boberchik342.CreateStormday.debug.WindDebugRenderer;
-import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.slf4j.Logger;
@@ -141,7 +140,7 @@ public class CreateStormday {
                         snapshot.addAll(set);
                     }
                     for (var pos : snapshot) {
-                        if (system.getBlockWindExposure(level, pos) * system.getWind().x <= 10) continue;
+                        if (system.getBlockWindExposure(level, pos).value * system.getWind().x <= 10) continue;
                         level.setBlock(pos, Blocks.AIR.defaultBlockState(), 0);
                     }
                 }
@@ -228,7 +227,7 @@ public class CreateStormday {
 
                         BlockPos pos = origin.offset(x * step, y * step, z * step);
 
-                        double e = wind.getDirectWindExposureD(level, pos);
+                        double e = wind.getDirectWindExposure(level, pos).value ? 1 : 0;
 
                         float r = (float) e;
                         float g = 0.2f;
@@ -370,7 +369,7 @@ public class CreateStormday {
                     (int) playerPos.y + level.random.nextInt(1 + 2 * size) - size,
                     (int) playerPos.z + level.random.nextInt(1 + 2 * size) - size
             );
-            if (WindSystem.get(level).getBlockWindExposure(level, pos) > 0.9) {
+            if (WindSystem.get(level).getBlockWindExposure(level, pos).value > 0.9) {
                 BlockState state = level.getBlockState(pos);
                 if (!state.isAir()) continue;
                 for (var dir : Direction.values()) {
