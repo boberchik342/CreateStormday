@@ -1,8 +1,13 @@
 package org.boberchik342.CreateStormday;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
@@ -11,6 +16,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -29,9 +35,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.EntityRenderersEvent;
-import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.event.*;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -43,6 +47,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import org.boberchik342.CreateStormday.debug.WindDebugBlock;
 import org.boberchik342.CreateStormday.debug.WindDebugBlockEntity;
 import org.boberchik342.CreateStormday.debug.WindDebugRenderer;
+import org.joml.Matrix3f;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -55,6 +62,7 @@ import java.util.function.Supplier;
 public class CreateStormday {
     public static final String MODID = "create_stormday";
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static boolean windDebug = false;
     private static int raycasts = 0;
 
     public static final DeferredRegister<Block> BLOCKS =
@@ -76,7 +84,7 @@ public class CreateStormday {
                     BlockEntityType.Builder.of(
                             WindDebugBlockEntity::new,
                             WIND_DEBUG_BLOCK.get()
-                    ).build(null)
+                    ).build(    null)
             );
 
     public CreateStormday(IEventBus modEventBus, ModContainer modContainer) {
@@ -188,6 +196,103 @@ public class CreateStormday {
         }
 
         @SubscribeEvent
+        public static void onRenderLevel(RenderLevelStageEvent event) {
+            if (!windDebug || event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES) return;
+            Minecraft mc = Minecraft.getInstance();
+            ClientLevel level = mc.level;
+            if (level == null) return;
+            renderSamples(level, event.getCamera().getPosition(), event.getPoseStack());
+        }
+
+        private static void renderSamples(ClientLevel level, Vec3 cam, PoseStack poseStack) {
+            WindSystem wind = WindSystem.get(level);
+
+            VertexConsumer vc = Minecraft.getInstance()
+                    .renderBuffers()
+                    .bufferSource()
+                    .getBuffer(RenderType.translucent());
+
+            poseStack.pushPose();
+
+            int step = WindSystem.sampleInterval;
+
+            BlockPos origin = new BlockPos(
+                    Mth.floor(cam.x / step) * step,
+                    Mth.floor(cam.y / step) * step,
+                    Mth.floor(cam.z / step) * step
+            );
+
+            for (int x = -8; x <= 8; x++) {
+                for (int y = -8; y <= 8; y++) {
+                    for (int z = -8; z <= 8; z++) {
+
+                        BlockPos pos = origin.offset(x * step, y * step, z * step);
+
+                        double e = wind.getDirectWindExposureD(level, pos);
+
+                        float r = (float) e;
+                        float g = 0.2f;
+                        float b = 1.0f - r;
+
+                        drawPoint(vc, poseStack, pos, cam, r, g, b);
+                    }
+                }
+            }
+            Minecraft.getInstance().renderBuffers().bufferSource().endBatch(RenderType.translucent());
+            poseStack.popPose();
+        }
+
+        private static void drawPoint(VertexConsumer vc, PoseStack poseStack,
+                                      BlockPos pos, Vec3 cam,
+                                      float r, float g, float b) {
+
+            Matrix4f m = poseStack.last().pose();
+
+            float size = 0.1f;
+
+            Vec3 center = new Vec3(
+                    pos.getX() - cam.x + 0.5,
+                    pos.getY() - cam.y + 0.5,
+                    pos.getZ() - cam.z + 0.5
+            );
+
+            Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+
+            Vector3f look = new Vector3f(camera.getLookVector());
+            Vector3f up = new Vector3f(0, 1, 0);
+            Vector3f right = new Vector3f();
+
+            look.cross(up, right).normalize();   // right = look × up
+            up = new Vector3f();
+            right.cross(look, up).normalize();   // up = right × look
+
+            Vec3 rVec = new Vec3(right).scale(size);
+            Vec3 uVec = new Vec3(up).scale(size);
+
+            int light = 0xF000F0;
+
+            // 4 corners of billboard
+            Vec3 p1 = center.subtract(rVec).subtract(uVec);
+            Vec3 p4 = center.subtract(rVec).add(uVec);
+            Vec3 p3 = center.add(rVec).add(uVec);
+            Vec3 p2 = center.add(rVec).subtract(uVec);
+
+
+
+            vc.addVertex(m, (float)p1.x, (float)p1.y, (float)p1.z)
+                    .setColor(r, g, b, 1).setUv(0, 0).setLight(light).setNormal(poseStack.last(), look.x, look.y, look.z);
+
+            vc.addVertex(m, (float)p2.x, (float)p2.y, (float)p2.z)
+                    .setColor(r, g, b, 1).setUv(0, 0).setLight(light).setNormal(poseStack.last(), look.x, look.y, look.z);
+
+            vc.addVertex(m, (float)p3.x, (float)p3.y, (float)p3.z)
+                    .setColor(r, g, b, 1).setUv(0, 0).setLight(light).setNormal(poseStack.last(), look.x, look.y, look.z);
+
+            vc.addVertex(m, (float)p4.x, (float)p4.y, (float)p4.z)
+                    .setColor(r, g, b, 1).setUv(0, 0).setLight(light).setNormal(poseStack.last(), look.x, look.y, look.z);
+        }
+
+        @SubscribeEvent
         public static void register(final RegisterPayloadHandlersEvent event) {
             final PayloadRegistrar registrar = event.registrar("1");
             registrar.commonToClient(
@@ -208,6 +313,17 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onRegisterCommands(RegisterCommandsEvent event) {
             WindCommand.register(event.getDispatcher());
+        }
+
+        @SubscribeEvent
+        public static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+            event.getDispatcher().register(
+                    Commands.literal("wind_debug")
+                            .executes(ctx -> {
+                                windDebug ^= true;
+                                return 1;
+                            })
+            );
         }
     }
 
@@ -245,7 +361,7 @@ public class CreateStormday {
             );
         }
 
-        int size = 5;
+        int size = 20;
         volume = (int) Math.pow(size * 2 + 1, 3);
 //        volume * strength / 64
         for (int i = 0; i < volume * strength / 64; i++) {
@@ -276,7 +392,7 @@ public class CreateStormday {
                             sidePos.getX() + offset.x,
                             sidePos.getY() + offset.y,
                             sidePos.getZ() + offset.z,
-                            0, 0, 0
+                            vx, 10, vz
                     );
                 }
             }

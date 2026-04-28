@@ -1,6 +1,7 @@
 package org.boberchik342.CreateStormday;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -44,30 +45,66 @@ public abstract class WindSystem {
 
     public double getBlockWindExposure(Level level, BlockPos pos) {
         BlockPos origin = new BlockPos(Math.floorDiv(pos.getX(), sampleInterval) * sampleInterval, Math.floorDiv(pos.getY(), sampleInterval) * sampleInterval, Math.floorDiv(pos.getZ(), sampleInterval) * sampleInterval);
-        double e000 = getDirectWindExposureD(level, origin);
-        double e001 = getDirectWindExposureD(level, new BlockPos(origin.getX(), origin.getY(), origin.getZ() + sampleInterval));
-        double e010 = getDirectWindExposureD(level, new BlockPos(origin.getX(), origin.getY() + sampleInterval, origin.getZ()));
-        double e011 = getDirectWindExposureD(level, new BlockPos(origin.getX(), origin.getY() + sampleInterval, origin.getZ() + sampleInterval));
-        double e100 = getDirectWindExposureD(level, new BlockPos(origin.getX() + sampleInterval, origin.getY(), origin.getZ()));
-        double e101 = getDirectWindExposureD(level, new BlockPos(origin.getX() + sampleInterval, origin.getY(), origin.getZ() + sampleInterval));
-        double e110 = getDirectWindExposureD(level, new BlockPos(origin.getX() + sampleInterval, origin.getY() + sampleInterval, origin.getZ()));
-        double e111 = getDirectWindExposureD(level, new BlockPos(origin.getX() + sampleInterval, origin.getY() + sampleInterval, origin.getZ() + sampleInterval));
+        BlockPos b000 = origin;
+        BlockPos b001 = new BlockPos(origin.getX(), origin.getY(), origin.getZ() + sampleInterval);
+        BlockPos b010 = new BlockPos(origin.getX(), origin.getY() + sampleInterval, origin.getZ());
+        BlockPos b011 = new BlockPos(origin.getX(), origin.getY() + sampleInterval, origin.getZ() + sampleInterval);
+        BlockPos b100 = new BlockPos(origin.getX() + sampleInterval, origin.getY(), origin.getZ());
+        BlockPos b101 = new BlockPos(origin.getX() + sampleInterval, origin.getY(), origin.getZ() + sampleInterval);
+        BlockPos b110 = new BlockPos(origin.getX() + sampleInterval, origin.getY() + sampleInterval, origin.getZ());
+        BlockPos b111 = new BlockPos(origin.getX() + sampleInterval, origin.getY() + sampleInterval, origin.getZ() + sampleInterval);
+        double e000 = getDirectWindExposureD(level, b000);
+        double e001 = getDirectWindExposureD(level, b001);
+        double e010 = getDirectWindExposureD(level, b010);
+        double e011 = getDirectWindExposureD(level, b011);
+        double e100 = getDirectWindExposureD(level, b100);
+        double e101 = getDirectWindExposureD(level, b101);
+        double e110 = getDirectWindExposureD(level, b110);
+        double e111 = getDirectWindExposureD(level, b111);
         int localX = Math.floorMod(pos.getX(), sampleInterval);
         int localY = Math.floorMod(pos.getY(), sampleInterval);
         int localZ = Math.floorMod(pos.getZ(), sampleInterval);
-        double tX = localX / (double) sampleInterval;
-        double tY = localY / (double) sampleInterval;
-        double tZ = localZ / (double) sampleInterval;
-        double e00 = interpolate(e000, e100, tX);
-        double e01 = interpolate(e001, e101, tX);
-        double e10 = interpolate(e010, e110, tX);
-        double e11 = interpolate(e011, e111, tX);
-        double e0 = interpolate(e00, e10, tY);
-        double e1 = interpolate(e01, e11, tY);
+        double tX00 = getT(level, b000, sampleInterval, new Vec3i(1, 0, 0), localX);
+        double tX01 = getT(level, b001, sampleInterval, new Vec3i(1, 0, 0), localX);
+        double tX10 = getT(level, b010, sampleInterval, new Vec3i(1, 0, 0), localX);
+        double tX11 = getT(level, b011, sampleInterval, new Vec3i(1, 0, 0), localX);
+        double tY0 = getT(level, new BlockPos(pos.getX(), b000.getY(), b000.getZ()), sampleInterval, new Vec3i(0, 1, 0), localY);
+        double tY1 = getT(level, new BlockPos(pos.getX(), b001.getY(), b001.getZ()), sampleInterval, new Vec3i(0, 1, 0), localY);
+        double tZ = getT(level, new BlockPos(pos.getX(), pos.getY(), b000.getZ()), sampleInterval, new Vec3i(0, 0, 1), localZ);
+        double e00 = interpolate(e000, e100, tX00);
+        double e01 = interpolate(e001, e101, tX01);
+        double e10 = interpolate(e010, e110, tX10);
+        double e11 = interpolate(e011, e111, tX11);
+        double e0 = interpolate(e00, e10, tY0);
+        double e1 = interpolate(e01, e11, tY1);
         return interpolate(e0, e1, tZ);
     }
 
     public abstract Vec2 getWind();
+
+    private static double getT(Level level, BlockPos a, int b, Vec3i dir, int c) {
+        int solidsA = 0;
+        int solidsB = 0;
+        for (int t = 0; t <= c; t++) {
+            BlockPos pos = a.offset(dir.multiply(t));
+            BlockState s = level.getBlockState(pos);
+            if (!s.isAir()) solidsA++;
+        }
+        for (int t = c; t <= b; t++) {
+            BlockPos pos = a.offset(dir.multiply(t));
+            BlockState s = level.getBlockState(pos);
+            if (!s.isAir()) solidsB++;
+        }
+        if (solidsA > 0 && solidsB > 0) {
+            return (double) solidsA / (solidsA + solidsB);
+        } else if (solidsA > 0) {
+            return 1;
+        } else if (solidsB > 0) {
+            return 0;
+        } else {
+            return (double) c / b;
+        }
+    }
 
     public Vector3d getWindVelocity() {
         return new Vector3d(
@@ -79,7 +116,7 @@ public abstract class WindSystem {
 
     public boolean computeDirectWindExposure(Level level, BlockPos pos) {
         Vec3 p = pos.getCenter();
-        Vector3d vel = getWindVelocity().mul(-1).add(0, 0.5, 0);
+        Vector3d vel = getWindVelocity().mul(-1).add(0, 1.5, 0);
         Vec3 dir = new Vec3(vel.x, vel.y, vel.z);
         boolean hit = false;
         BlockPos bPos = pos;
@@ -116,7 +153,7 @@ public abstract class WindSystem {
         }
         if (level.isLoaded(pos)) {
             Map<BlockPos, WindEntry> directExposure = directWindExposureCache.computeIfAbsent((LevelChunk) level.getChunk(pos), k -> new HashMap<>());
-            directExposure.put(pos, new WindEntry(level.getGameTime(), hit ? 1 : 0));
+            directExposure.put(pos, new WindEntry(level.getGameTime(), hit ? 0 : 1));
         }
 //        LogUtils.getLogger().info("Computed wind");
         windComputations++;
