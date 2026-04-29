@@ -7,6 +7,7 @@ import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -82,8 +83,10 @@ public class CreateStormday {
 
         @SubscribeEvent
         public static void onClientTick(ClientTickEvent.Post event) {
+            if (Minecraft.getInstance().isPaused()) return;
+            PinwheelItemRenderer.tick();
             if (Minecraft.getInstance().level == null) return;
-            WindVisuals.spawnWindParticles(Minecraft.getInstance());
+            WindGraphics.spawnParticles(Minecraft.getInstance());
         }
 
         @SubscribeEvent
@@ -116,11 +119,6 @@ public class CreateStormday {
         }
 
         @SubscribeEvent
-        public static void tickRenderers(RenderFrameEvent.Pre event) {
-            PinwheelItemRenderer.tick();
-        }
-
-        @SubscribeEvent
         public static void registerClientExtensions(RegisterClientExtensionsEvent event) {
             event.registerItem(new PinwheelItemExtensions(), AllItems.PINWHEEL.get());
         }
@@ -129,6 +127,9 @@ public class CreateStormday {
         public static void onEntityTick(EntityTickEvent.Pre event) {
             Entity entity = event.getEntity();
             WindSystem system = WindSystem.get(entity.level());
+            if (entity instanceof Player player) {
+                if (player.getAbilities().flying) return;
+            }
             event.getEntity().addDeltaMovement(system.getWindVelocityAt(entity.level(), BlockPos.containing(entity.position())).scale(1.0/20/100 * Config.windPushStrength));
         }
     }

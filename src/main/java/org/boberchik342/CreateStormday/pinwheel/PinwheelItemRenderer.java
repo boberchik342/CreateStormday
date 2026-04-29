@@ -12,13 +12,13 @@ import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.client.resources.model.ModelResourceLocation;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.CreateStormday;
 import org.boberchik342.CreateStormday.wind.WindSystem;
-import org.joml.Vector3d;
 
 import java.util.WeakHashMap;
 
@@ -27,6 +27,16 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
         public State() {
 
         }
+
+        public void next() {
+            prevRotation = rotation;
+        }
+
+        public float getRotation(float pt) {
+            return rotation * pt + prevRotation * (1 - pt);
+        }
+
+        public float prevRotation;
         public float speed;
         public float rotation;
     }
@@ -40,23 +50,27 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
     public static void tick() {
         // ts prob works fr fr no cap i think maybe hopefully probably
         if (Minecraft.getInstance().level == null) return;
-        Vector3d vel = WindSystem.get(Minecraft.getInstance().level).getWindVelocity();
-        Vec3 windVel = new Vec3(vel.x, vel.y, vel.z);
+        Vec3 windVel = WindSystem.get(Minecraft.getInstance().level).getWindVelocityAt(
+                Minecraft.getInstance().level,
+                BlockPos.containing(Minecraft.getInstance().player.getPosition(1))
+        );
         Vec3 playerVel = new Vec3(0, 0, 0);
         if (Minecraft.getInstance().player != null) {
-            playerVel = Minecraft.getInstance().player.getDeltaMovement().scale(20);
+            playerVel = Minecraft.getInstance().player.getDeltaMovement().scale(5);
         }
         Vec3 relativeVel = windVel.subtract(playerVel);
         float targetSpeed = (float) relativeVel.length();
         if (Minecraft.getInstance().player != null) {
-            targetSpeed = (float) new Vec3(0, 0, 1).yRot(Minecraft.getInstance().player.getYRot()).dot(relativeVel);
+            targetSpeed = (float) Minecraft.getInstance().player.getViewVector(1).dot(relativeVel) / 10;
         }
+        fpState.next();
         fpState.speed = (float) (fpState.speed * 0.9 + targetSpeed * 0.1);
-        fpState.rotation += (float) ((float) (Minecraft.getInstance().getFrameTimeNs() / 500000000.0 * fpState.speed));
+        fpState.rotation += fpState.speed;
         if (Minecraft.getInstance().level == null) return;
         for (var state : states.values()) {
+            state.next();
             state.speed = (float) (state.speed * 0.9 + WindSystem.get(Minecraft.getInstance().level).getWind().x * 0.1);
-            state.rotation += (float) ((float) (Minecraft.getInstance().getFrameTimeNs() / 500000000.0 * state.speed));
+            state.rotation += state.speed;
         }
     }
 
@@ -67,6 +81,7 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
                              MultiBufferSource buffer,
                              int light,
                              int overlay) {
+        float pt = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true);
         ItemRenderer itemRenderer = Minecraft.getInstance().getItemRenderer();
         ModelManager modelManager = Minecraft.getInstance().getModelManager();
 
@@ -74,10 +89,10 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
         boolean fp = context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND || context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
         if (!fp) {
             if (Minecraft.getInstance().level != null) {
-                rot = states.computeIfAbsent(Minecraft.getInstance().level, k -> new State()).rotation;
+                rot = states.computeIfAbsent(Minecraft.getInstance().level, k -> new State()).getRotation(pt);
             }
         } else {
-            rot = fpState.rotation;
+            rot = fpState.getRotation(pt);
         }
 
         BakedModel blades = modelManager.getModel(

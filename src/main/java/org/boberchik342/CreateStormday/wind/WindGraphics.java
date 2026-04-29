@@ -7,17 +7,15 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.Config;
 
-public class WindVisuals {
-    public static void spawnWindParticles(Minecraft mc) {
-        if (mc.isPaused()) return;
-
+public class WindGraphics {
+    public static void spawnParticles(Minecraft mc) {
         ClientLevel level = mc.level;
-
         if (mc.level == null || mc.player == null) return;
 
         Vec2 wind = WindSystem.get(level).getWind();
@@ -27,6 +25,16 @@ public class WindVisuals {
         float direction = wind.y;
         float strength = wind.x;
 
+        if (Config.enableWindParticles) {
+            spawnWindParticles(direction, strength, playerPos, level);
+        }
+
+        if (Config.enableGroundParticles) {
+            spawnGroundParticles(direction, strength, playerPos, level);
+        }
+    }
+
+    private static void spawnWindParticles(float direction, float strength, Vec3 playerPos, Level level) {
         double vx = Math.cos(direction) * strength;
         double vz = Math.sin(direction) * strength;
         int volume = Config.windParticleSpawnAreaSize * Config.windParticleSpawnAreaSize * Config.windParticleSpawnAreaSize;
@@ -46,15 +54,17 @@ public class WindVisuals {
                     vz + jitterZ
             );
         }
+    }
 
-        int size = 20;
-        volume = (int) Math.pow(size * 2 + 1, 3);
-//        volume * strength / 64
+    private static void spawnGroundParticles(float direction, float strength, Vec3 playerPos, Level level) {
+        double vx = Math.cos(direction) * strength;
+        double vz = Math.sin(direction) * strength;
+        int volume = (int) Math.pow(Config.groundParticleSpawnAreaSize * 2 + 1, 3);
         for (int i = 0; i < volume * strength / 64; i++) {
             BlockPos pos = new BlockPos(
-                    (int) playerPos.x + level.random.nextInt(1 + 2 * size) - size,
-                    (int) playerPos.y + level.random.nextInt(1 + 2 * size) - size,
-                    (int) playerPos.z + level.random.nextInt(1 + 2 * size) - size
+                    (int) playerPos.x + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize,
+                    (int) playerPos.y + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize,
+                    (int) playerPos.z + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize
             );
             if (WindSystem.get(level).getBlockWindExposure(level, pos).value > 0.9) {
                 BlockState state = level.getBlockState(pos);
@@ -74,7 +84,6 @@ public class WindVisuals {
                     offset = offset.multiply(a).add(b);
                     level.addParticle(
                             new BlockParticleOption(ParticleTypes.BLOCK, s),
-//                            ParticleTypes.CLOUD,
                             sidePos.getX() + offset.x,
                             sidePos.getY() + offset.y,
                             sidePos.getZ() + offset.z,

@@ -10,6 +10,9 @@ public class Config {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     private static final ModConfigSpec.BooleanValue WIND_BREAKS_CROPS = BUILDER.define("wind_breaks_crops", true);
     private static final ModConfigSpec.IntValue WIND_PARTICLE_SPAWN_AREA_SIZE = BUILDER.defineInRange("wind_particle_spawn_area_size", 200, 50, 1000);
+    private static final ModConfigSpec.BooleanValue ENABLE_WIND_PARTICLES = BUILDER.define("enable_wind_particles", true);
+    private static final ModConfigSpec.IntValue GROUD_PARTICLE_SPAWN_AREA_SIZE = BUILDER.defineInRange("ground_particle_spawn_area_size", 30, 5, 200);
+    private static final ModConfigSpec.BooleanValue ENABLE_GROUND_PARTICLES = BUILDER.define("enable_ground_particles", true);
     private static final ModConfigSpec.IntValue WIND_SAMPLE_INTERVAL = BUILDER.defineInRange("wind_sample_interval", 4, 1, 16);
     private static final ModConfigSpec.IntValue WIND_PUSH_STRENGTH = BUILDER.defineInRange("wind_push_strength", 5, 0, 200);
     static final ModConfigSpec SPEC = BUILDER.build();
@@ -18,6 +21,10 @@ public class Config {
     public static int windParticleSpawnAreaSize;
     public static int windSampleInterval;
     public static int windPushStrength;
+    public static int groundParticleSpawnAreaSize;
+    public static boolean enableWindParticles;
+    public static boolean enableGroundParticles;
+
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -25,5 +32,8 @@ public class Config {
         windParticleSpawnAreaSize = WIND_PARTICLE_SPAWN_AREA_SIZE.get();
         windSampleInterval = WIND_SAMPLE_INTERVAL.get();
         windPushStrength = WIND_PUSH_STRENGTH.get();
+        groundParticleSpawnAreaSize = GROUD_PARTICLE_SPAWN_AREA_SIZE.get();
+        enableGroundParticles = ENABLE_GROUND_PARTICLES.get();
+        enableWindParticles = ENABLE_WIND_PARTICLES.get();
     }
 }
