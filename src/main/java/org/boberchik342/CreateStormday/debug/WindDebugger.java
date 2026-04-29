@@ -16,6 +16,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import org.boberchik342.CreateStormday.Config;
 import org.boberchik342.CreateStormday.CreateStormday;
 import org.boberchik342.CreateStormday.wind.WindSystem;
 import org.joml.Matrix4f;
@@ -45,7 +46,7 @@ public class WindDebugger {
 
         poseStack.pushPose();
 
-        int step = WindSystem.sampleInterval;
+        int step = Config.windSampleInterval;
 
         BlockPos origin = new BlockPos(
                 Mth.floor(cam.x / step) * step,

@@ -1,28 +1,28 @@
 package org.boberchik342.CreateStormday;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
-import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.commands.Commands;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
+import net.minecraft.client.renderer.item.ItemProperties;
+import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec2;
@@ -34,8 +34,11 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.client.event.*;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -43,23 +46,19 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
-import net.neoforged.neoforge.registries.DeferredRegister;
-import org.boberchik342.CreateStormday.debug.WindDebugBlock;
-import org.boberchik342.CreateStormday.debug.WindDebugBlockEntity;
 import org.boberchik342.CreateStormday.debug.WindDebugRenderer;
 import org.boberchik342.CreateStormday.wind.ServerWindSystem;
 import org.boberchik342.CreateStormday.wind.WindCommand;
 import org.boberchik342.CreateStormday.wind.WindPacket;
 import org.boberchik342.CreateStormday.wind.WindSystem;
-import org.joml.Matrix4f;
-import org.joml.Vector3f;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
 
 @Mod(CreateStormday.MODID)
 public class CreateStormday {
@@ -71,6 +70,7 @@ public class CreateStormday {
 //        NeoForge.EVENT_BUS.register(this);
         AllBlocks.BLOCKS.register(modEventBus);
         AllBlockEntities.BLOCK_ENTITIES.register(modEventBus);
+        AllItems.ITEMS.register(modEventBus);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         modContainer.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
@@ -84,17 +84,6 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onCommonSetup(FMLCommonSetupEvent event) {
             LOGGER.info("Wind breaks crops: {}", Config.windBreaksCrops);
-//            BlockPos pos = new BlockPos(0, 0, 0);
-//            for (var dir : Direction.values()) {
-//                LOGGER.info(dir.getName());
-//                BlockPos sidePos = pos.offset(dir.getNormal());
-//                LOGGER.info(sidePos.toString());
-//                Vec3i n = dir.getNormal().multiply(-1);
-//                Vec3 a = new Vec3(1 - Math.abs(dir.getNormal().getX()), 1 - Math.abs(dir.getNormal().getY()), 1 - Math.abs(dir.getNormal().getZ()));
-//                LOGGER.info(a.toString());
-//                Vec3 b = new Vec3(Math.max(n.getX(), 0), Math.max(n.getY(), 0), Math.max(n.getZ(), 0));
-//                LOGGER.info(b.toString());
-//            }
         }
 
         @SubscribeEvent // on the mod event bus only on the physical client
@@ -126,7 +115,6 @@ public class CreateStormday {
                     }
                 }
             }
-
         }
 
         @SubscribeEvent
@@ -170,7 +158,11 @@ public class CreateStormday {
             spawnWindParticles(Minecraft.getInstance());
         }
 
-
+        @SubscribeEvent
+        public static void registerAdditional(ModelEvent.RegisterAdditional event) {
+            event.register(ModelResourceLocation.standalone(CreateStormday.id("pinwheel_handle")));
+            event.register(ModelResourceLocation.standalone(CreateStormday.id("pinwheel_blades")));
+        }
 
         @SubscribeEvent
         public static void register(final RegisterPayloadHandlersEvent event) {
@@ -185,6 +177,45 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onRegisterCommands(RegisterCommandsEvent event) {
             WindCommand.register(event.getDispatcher());
+        }
+        @SubscribeEvent
+        public static void onClientSetup(FMLClientSetupEvent event) {
+            event.enqueueWork(() -> {
+                ItemProperties.register(
+                        AllItems.PINWHEEL.get(),
+                        CreateStormday.id("dummy"),
+                        (stack, level, entity, seed) -> 0f
+                );
+            });
+        }
+
+        @SubscribeEvent
+        public static void registerClientExtensions(RegisterClientExtensionsEvent event) {
+
+            event.registerItem(new IClientItemExtensions() {
+                private static final HumanoidModel.ArmPose EXAMPLE_POSE = HumanoidModel.ArmPose.BOW_AND_ARROW;
+
+                private final BlockEntityWithoutLevelRenderer renderer =
+                        new PinwheelItemRenderer(
+                                Minecraft.getInstance().getBlockEntityRenderDispatcher(),
+                                Minecraft.getInstance().getEntityModels()
+                        );
+
+                @Override
+                public HumanoidModel.ArmPose getArmPose(LivingEntity entityLiving, InteractionHand hand, ItemStack itemStack) {
+                    return EXAMPLE_POSE;
+                }
+
+                @Override
+                public @NotNull BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                    return renderer;
+                }
+
+                @Override
+                public boolean applyForgeHandTransform(PoseStack poseStack, LocalPlayer player, HumanoidArm arm, ItemStack itemInHand, float partialTick, float equipProcess, float swingProcess) {
+                    return IClientItemExtensions.super.applyForgeHandTransform(poseStack, player, arm, itemInHand, partialTick, equipProcess, swingProcess);
+                }
+            }, AllItems.PINWHEEL.get());
         }
     }
 

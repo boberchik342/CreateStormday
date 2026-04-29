@@ -1,0 +1,29 @@
+{
+	"format_version": "1.9.0",
+	"credit": "Made with Blockbench",
+	"textures": {
+		"0": "create_stormday:item/pinwheel",
+		"particle": "create_stormday:item/pinwheel"
+	},
+	"elements": [
+		{
+			"name": "handle",
+			"from": [7.5, 0, 7.5],
+			"to": [8.5, 12, 8.5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 0, 8]},
+			"faces": {
+				"north": {"uv": [0, 0, 1, 12], "texture": "#0"},
+				"east": {"uv": [1, 0, 2, 12], "texture": "#0"},
+				"south": {"uv": [2, 0, 3, 12], "texture": "#0"},
+				"west": {"uv": [3, 0, 4, 12], "texture": "#0"},
+				"up": {"uv": [1, 14, 0, 13], "texture": "#0"},
+				"down": {"uv": [14, 0, 13, 1], "texture": "#0"}
+			}
+		}
+	],
+	"display": {
+		"thirdperson_righthand": {
+			"translation": [0, 4, 0]
+		}
+	}
+}
