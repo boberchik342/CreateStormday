@@ -4,7 +4,9 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.client.resources.model.ModelResourceLocation;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -21,6 +23,7 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -120,6 +123,13 @@ public class CreateStormday {
         @SubscribeEvent
         public static void registerClientExtensions(RegisterClientExtensionsEvent event) {
             event.registerItem(new PinwheelItemExtensions(), AllItems.PINWHEEL.get());
+        }
+
+        @SubscribeEvent
+        public static void onEntityTick(EntityTickEvent.Pre event) {
+            Entity entity = event.getEntity();
+            WindSystem system = WindSystem.get(entity.level());
+            event.getEntity().addDeltaMovement(system.getWindVelocityAt(entity.level(), BlockPos.containing(entity.position())).scale(1.0/20/100 * Config.windPushStrength));
         }
     }
 }

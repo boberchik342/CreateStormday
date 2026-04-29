@@ -269,4 +269,10 @@ public abstract class WindSystem {
             }
         }
     }
+
+    public Vec3 getWindVelocityAt(Level level, BlockPos pos) {
+        Vector3d sped = getWindVelocity();
+        sped.mul(getBlockWindExposure(level, pos).value);
+        return new Vec3(sped.x, sped.y, sped.z);
+    }
 }
