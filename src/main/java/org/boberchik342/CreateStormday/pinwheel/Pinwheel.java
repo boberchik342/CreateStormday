@@ -1,4 +1,4 @@
-package org.boberchik342.CreateStormday;
+package org.boberchik342.CreateStormday.pinwheel;
 
 import net.minecraft.world.item.Item;
 

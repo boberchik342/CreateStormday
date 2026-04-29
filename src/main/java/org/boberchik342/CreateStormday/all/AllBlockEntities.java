@@ -1,8 +1,9 @@
-package org.boberchik342.CreateStormday;
+package org.boberchik342.CreateStormday.all;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import org.boberchik342.CreateStormday.CreateStormday;
 import org.boberchik342.CreateStormday.debug.WindDebugBlockEntity;
 
 import java.util.function.Supplier;

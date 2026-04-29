@@ -1,9 +1,10 @@
-package org.boberchik342.CreateStormday;
+package org.boberchik342.CreateStormday.all;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import org.boberchik342.CreateStormday.CreateStormday;
 import org.boberchik342.CreateStormday.debug.WindDebugBlock;
 
 import java.util.function.Supplier;

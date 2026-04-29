@@ -1,8 +1,10 @@
-package org.boberchik342.CreateStormday;
+package org.boberchik342.CreateStormday.all;
 
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import org.boberchik342.CreateStormday.CreateStormday;
+import org.boberchik342.CreateStormday.pinwheel.Pinwheel;
 
 public class AllItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(CreateStormday.MODID);

@@ -1,18 +1,24 @@
 package org.boberchik342.CreateStormday.wind;
 
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.event.level.ChunkEvent;
 import org.boberchik342.CreateStormday.Config;
 import org.joml.Vector3d;
 
 import java.util.*;
+import java.util.logging.Logger;
 
 public abstract class WindSystem {
     public static class WindEntry<T> {
@@ -212,5 +218,55 @@ public abstract class WindSystem {
 
     private static boolean isBlockWindPassable(BlockState state) {
         return state.isAir() || state.getBlock() instanceof CropBlock;
+    }
+
+    public static void tickWind(Iterable<ServerLevel> levels) {
+        for (var level : levels) {
+            WindSystem system = WindSystem.get(level);
+            if (system instanceof ServerWindSystem serverSystem) {
+                serverSystem.tick(level);
+            }
+            if (system.getWind().x > 10 && Config.windBreaksCrops) {
+                List<BlockPos> snapshot = new ArrayList<>();
+
+                for (Set<BlockPos> set : system.crops.values()) {
+                    snapshot.addAll(set);
+                }
+                for (var pos : snapshot) {
+                    if (system.getBlockWindExposure(level, pos).value * system.getWind().x <= 10) continue;
+                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                }
+            }
+        }
+    }
+
+    public static void onChunkLoad(LevelChunk chunk) {
+        var system = WindSystem.get(chunk.getLevel());
+        Set<BlockPos> crops = system.crops.computeIfAbsent(chunk, k -> new HashSet<>());
+
+        int minY = chunk.getMinBuildHeight();
+        int maxY = chunk.getMaxBuildHeight();
+
+        ChunkPos cp = chunk.getPos();
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y < maxY; y++) {
+
+                    BlockPos pos = new BlockPos(
+                            cp.getMinBlockX() + x,
+                            y,
+                            cp.getMinBlockZ() + z
+                    );
+
+                    BlockState state = chunk.getBlockState(pos);
+
+                    if (state.getBlock() instanceof CropBlock) {
+                        LogUtils.getLogger().info("found crop");
+                        crops.add(pos);
+                    }
+                }
+            }
+        }
     }
 }

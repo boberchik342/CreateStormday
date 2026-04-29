@@ -1,9 +1,7 @@
-package org.boberchik342.CreateStormday;
+package org.boberchik342.CreateStormday.pinwheel;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.logging.LogUtils;
 import com.mojang.math.Axis;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
@@ -16,6 +14,7 @@ import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import org.boberchik342.CreateStormday.CreateStormday;
 import org.boberchik342.CreateStormday.wind.WindSystem;
 
 public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
@@ -44,9 +43,9 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
             speed = (float) (speed * 0.9 + WindSystem.get(Minecraft.getInstance().level).getWind().x * 0.1);
             rotation += (float) ((float) (Minecraft.getInstance().getFrameTimeNs() / 500000000.0 * speed));
         }
-        poseStack.translate(0.5, (double) 12/16, 0.5);     // move pivot to center
-        poseStack.mulPose(Axis.ZP.rotation(rotation)); // rotate (pinwheel spins on Z usually)
-        poseStack.translate(-0.5, -(double) 12/16, -0.5);  // move back
+        poseStack.translate(0.5, (double) 12/16, 0.5);
+        poseStack.mulPose(Axis.ZP.rotation(rotation));
+        poseStack.translate(-0.5, -(double) 12/16, -0.5);
 
         itemRenderer.renderModelLists(
                 blades,

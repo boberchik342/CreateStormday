@@ -5,7 +5,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import org.boberchik342.CreateStormday.AllBlockEntities;
+import org.boberchik342.CreateStormday.all.AllBlockEntities;
 import org.boberchik342.CreateStormday.wind.WindSystem;
 
 public class WindDebugBlockEntity extends BlockEntity {
