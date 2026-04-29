@@ -29,6 +29,7 @@ import org.boberchik342.CreateStormday.all.AllBlocks;
 import org.boberchik342.CreateStormday.all.AllItems;
 import org.boberchik342.CreateStormday.debug.WindDebugRenderer;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelItemExtensions;
+import org.boberchik342.CreateStormday.pinwheel.PinwheelItemRenderer;
 import org.boberchik342.CreateStormday.wind.*;
 import org.slf4j.Logger;
 
@@ -109,6 +110,11 @@ public class CreateStormday {
                     CreateStormday.id("dummy"),
                     (stack, level, entity, seed) -> 0f
             ));
+        }
+
+        @SubscribeEvent
+        public static void tickRenderers(RenderFrameEvent.Pre event) {
+            PinwheelItemRenderer.tick();
         }
 
         @SubscribeEvent

@@ -204,7 +204,7 @@ public abstract class WindSystem {
             }
         }
         boolean hit = computeDirectWindExposure(level, pos);
-        WindEntry<Boolean> entry = new WindEntry<>(level.getGameTime(), hit);
+        WindEntry<Boolean> entry = new WindEntry<>(level.getGameTime() + (pos.hashCode() & 7), hit);
         if (level.isLoaded(pos)) {
             Map<BlockPos, WindEntry<Boolean>> directExposure = directWindExposureCache.computeIfAbsent((LevelChunk) level.getChunk(pos), k -> new HashMap<>());
             directExposure.put(pos, entry);

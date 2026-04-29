@@ -14,15 +14,52 @@ import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.CreateStormday;
 import org.boberchik342.CreateStormday.wind.WindSystem;
+import org.joml.Vector3d;
+
+import java.util.WeakHashMap;
 
 public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
-    public static float rotation = 0;
-    public static float speed = 0;
+    private static class State {
+        public State() {
+
+        }
+        public float speed;
+        public float rotation;
+    }
+    private static State fpState = new State();
+    private static final WeakHashMap<Level, State> states = new WeakHashMap<>();
+
     public PinwheelItemRenderer(BlockEntityRenderDispatcher dispatcher, EntityModelSet set) {
         super(dispatcher, set);
     }
+
+    public static void tick() {
+        // ts prob works fr fr no cap i think maybe hopefully probably
+        if (Minecraft.getInstance().level == null) return;
+        Vector3d vel = WindSystem.get(Minecraft.getInstance().level).getWindVelocity();
+        Vec3 windVel = new Vec3(vel.x, vel.y, vel.z);
+        Vec3 playerVel = new Vec3(0, 0, 0);
+        if (Minecraft.getInstance().player != null) {
+            playerVel = Minecraft.getInstance().player.getDeltaMovement().scale(20);
+        }
+        Vec3 relativeVel = windVel.subtract(playerVel);
+        float targetSpeed = (float) relativeVel.length();
+        if (Minecraft.getInstance().player != null) {
+            targetSpeed = (float) new Vec3(0, 0, 1).yRot(Minecraft.getInstance().player.getYRot()).dot(relativeVel);
+        }
+        fpState.speed = (float) (fpState.speed * 0.9 + targetSpeed * 0.1);
+        fpState.rotation += (float) ((float) (Minecraft.getInstance().getFrameTimeNs() / 500000000.0 * fpState.speed));
+        if (Minecraft.getInstance().level == null) return;
+        for (var state : states.values()) {
+            state.speed = (float) (state.speed * 0.9 + WindSystem.get(Minecraft.getInstance().level).getWind().x * 0.1);
+            state.rotation += (float) ((float) (Minecraft.getInstance().getFrameTimeNs() / 500000000.0 * state.speed));
+        }
+    }
+
     @Override
     public void renderByItem(ItemStack stack,
                              ItemDisplayContext context,
@@ -32,6 +69,17 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
                              int overlay) {
         ItemRenderer itemRenderer = Minecraft.getInstance().getItemRenderer();
         ModelManager modelManager = Minecraft.getInstance().getModelManager();
+
+        float rot = 0;
+        boolean fp = context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND || context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
+        if (!fp) {
+            if (Minecraft.getInstance().level != null) {
+                rot = states.computeIfAbsent(Minecraft.getInstance().level, k -> new State()).rotation;
+            }
+        } else {
+            rot = fpState.rotation;
+        }
+
         BakedModel blades = modelManager.getModel(
                 ModelResourceLocation.standalone(CreateStormday.id("pinwheel_blades"))
         );
@@ -39,13 +87,11 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
                 ModelResourceLocation.standalone(CreateStormday.id("pinwheel_handle"))
         );
         poseStack.pushPose();
-        if (Minecraft.getInstance().level != null) {
-            speed = (float) (speed * 0.9 + WindSystem.get(Minecraft.getInstance().level).getWind().x * 0.1);
-            rotation += (float) ((float) (Minecraft.getInstance().getFrameTimeNs() / 500000000.0 * speed));
-        }
         poseStack.translate(0.5, (double) 12/16, 0.5);
-        poseStack.mulPose(Axis.ZP.rotation(rotation));
+        poseStack.mulPose(Axis.ZP.rotation(rot));
         poseStack.translate(-0.5, -(double) 12/16, -0.5);
+
+
 
         itemRenderer.renderModelLists(
                 blades,
