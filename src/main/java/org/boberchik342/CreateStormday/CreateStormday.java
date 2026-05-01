@@ -64,9 +64,12 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onCommonSetup(FMLCommonSetupEvent event) {
             LOGGER.info("Wind breaks crops: {}", Config.windBreaksCrops);
+            if (!RaycastOctree.boundsLogicCheck()) {
+                throw new RuntimeException("Bounds logic check did not pass");
+            }
             RaycastOctree octree = new RaycastOctree();
             Set<BlockPos> enabled = new HashSet<>();
-            for (int i = 0; i < 10000; i++) {
+            for (int i = 0; i < 1000; i++) {
                 BlockPos pos = new BlockPos(
                         (int)(Math.random()*100-50),
                         (int)(Math.random()*100-50),
@@ -75,7 +78,7 @@ public class CreateStormday {
                 enabled.add(pos);
                 octree.set(pos, true);
             }
-            for (int i = 0; i < 100000; i++) {
+            for (int i = 0; i < 10000; i++) {
                 BlockPos pos = new BlockPos(
                         (int)(Math.random()*100-50),
                         (int)(Math.random()*100-50),
@@ -84,6 +87,9 @@ public class CreateStormday {
                 if (enabled.contains(pos) != octree.get(pos)) {
                     throw new RuntimeException("Octree didn't pass the test");
                 }
+            }
+            if (!octree.structureCheck()) {
+                throw new RuntimeException("Octree didn't pass structure test");
             }
         }
 

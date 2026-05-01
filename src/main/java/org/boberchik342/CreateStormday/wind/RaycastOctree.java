@@ -1,10 +1,14 @@
 package org.boberchik342.CreateStormday.wind;
 
 import com.mojang.logging.LogUtils;
+import dev.ryanhcode.sable.api.SubLevelHelper;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
+import org.boberchik342.CreateStormday.mixin.BlockSubLevelLiftProviderMixin;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Stack;
 
 public class RaycastOctree {
@@ -39,16 +43,8 @@ public class RaycastOctree {
 
         while (true) {
             trace.add(nodeInfo.id);
-            LogUtils.getLogger().info("---------------------------------");
-            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.east));
-            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.west));
-            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.upper));
-            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.lower));
-            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.south));
-            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.north));
             if (nodeInfo.bounds.isSingleBlock()) {
                 data.set(nodeInfo.id, value ? -2 : -1); // set the value
-                LogUtils.getLogger().info("Set the thingy");
                 trace.pop();
                 while (!trace.empty() && tryCollapse(trace.pop())) {}
                 return;
@@ -124,14 +120,17 @@ public class RaycastOctree {
     private void expandToContain(BlockPos pos) {
         Bounds bounds = getBounds();
         while (!bounds.contains(pos)) {
-            LogUtils.getLogger().info("expanding");
+//            LogUtils.getLogger().info("expanding");
             boolean up = pos.getY() > bounds.upper;
             boolean east = pos.getX() > bounds.east;
             boolean south = pos.getZ() > bounds.south;
-            int childId = getChildIndex(!up, !east, !south);
-            int id = createChildren(false);
-            data.set(id + childId, data.getInt(0)); // move the root node
-            data.set(0, id); // set the root to point at new children
+            if (data.getInt(0) != -1) {
+                int childId = getChildIndex(!up, !east, !south);
+                int id = createChildren(false);
+                data.set(id + childId, data.getInt(0)); // move the root node
+                data.set(0, id); // set the root to point at new children
+            }
+
             sizePower++;
             if (up) {
                 bounds.upper = bounds.lower + (1 << sizePower) - 1;
@@ -149,7 +148,7 @@ public class RaycastOctree {
                 bounds.north = bounds.south - (1 << sizePower) + 1;
             }
             origin = bounds.getOrigin();
-            printBounds(bounds);
+//            printBounds(bounds);
         }
     }
 
@@ -300,5 +299,74 @@ public class RaycastOctree {
         LogUtils.getLogger().info("west - {}", bounds.west);
         LogUtils.getLogger().info("south - {}", bounds.south);
         LogUtils.getLogger().info("north - {}", bounds.north);
+    }
+
+    /**
+     * checks the structure of the octree
+     * @return true if the structure is correct and false if otherwise
+     */
+    public boolean structureCheck() {
+        Stack<Integer> stack = new Stack<>();
+        Set<Integer> visited = new HashSet<>();
+        stack.add(0);
+
+        while (!stack.empty()) {
+            int id = stack.pop();
+            if (visited.contains(id)) {
+                return false;
+            }
+            visited.add(id);
+            if (data.getInt(id) < 0) {
+                continue;
+            }
+
+            int firstChild = data.getInt(id);
+            int value = data.getInt(firstChild);
+            boolean equal = true;
+            for (int i = 0; i < 8; i++) {
+                stack.add(firstChild + i);
+                if (data.getInt(firstChild + i) != value) {
+                    equal = false;
+                }
+            }
+            if (equal) return false;
+        }
+
+        return true;
+    }
+
+    public static boolean boundsLogicCheck() {
+        Bounds bounds = new Bounds();
+        bounds.north = 0;
+        bounds.south = 0;
+        bounds.west = 0;
+        bounds.east = 0;
+        bounds.upper = 0;
+        bounds.lower = 0;
+        if (!bounds.isSingleBlock()) return false;
+        bounds = new Bounds();
+        bounds.north = -2;
+        bounds.south = 1;
+        bounds.west = -2;
+        bounds.east = 1;
+        bounds.upper = 1;
+        bounds.lower = -2;
+        if (bounds.isSingleBlock()) return false;
+        Bounds childBounds = getChildBounds(bounds, getChildIndex(true, true, true));
+        if (
+                childBounds.lower != 0 || childBounds.upper != 1 ||
+                childBounds.west != 0 || childBounds.east != 1 ||
+                childBounds.north != 0 || childBounds.south != 1
+        ) return false;
+        if (childBounds.isSingleBlock()) return false;
+        childBounds = getChildBounds(bounds, getChildIndex(false, false, false));
+        if (
+                childBounds.lower != -2 || childBounds.upper != -1 ||
+                childBounds.west != -2 || childBounds.east != -1 ||
+                childBounds.north != -2 || childBounds.south != -1
+        ) return false;
+        if (childBounds.isSingleBlock()) return false;
+
+        return true;
     }
 }
