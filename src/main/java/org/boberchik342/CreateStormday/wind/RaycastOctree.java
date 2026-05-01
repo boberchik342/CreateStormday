@@ -1,5 +1,6 @@
 package org.boberchik342.CreateStormday.wind;
 
+import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
@@ -8,7 +9,7 @@ import java.util.Stack;
 
 public class RaycastOctree {
     private int sizePower = 0;
-    private BlockPos origin;
+    private BlockPos origin = new BlockPos(0, 0, 0);
     private final IntArrayList data = new IntArrayList();
     private final Stack<Integer> freeIndices = new Stack<>();
 
@@ -27,6 +28,7 @@ public class RaycastOctree {
     }
 
     public void set(BlockPos pos, boolean value) {
+        LogUtils.getLogger().info("Set {} to {}", pos, value);
         if (!contains(pos)) {
             if (!value) return;
             expandToContain(pos);
@@ -35,26 +37,35 @@ public class RaycastOctree {
         NodeInfo nodeInfo = new NodeInfo(0, getBounds());
         Stack<Integer> trace = new Stack<>(); // used to collapse the nodes
 
-        while (nodeInfo != null) {
+        while (true) {
             trace.add(nodeInfo.id);
+            LogUtils.getLogger().info("---------------------------------");
+            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.east));
+            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.west));
+            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.upper));
+            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.lower));
+            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.south));
+            LogUtils.getLogger().info(String.valueOf(nodeInfo.bounds.north));
             if (nodeInfo.bounds.isSingleBlock()) {
                 data.set(nodeInfo.id, value ? -2 : -1); // set the value
+                LogUtils.getLogger().info("Set the thingy");
                 trace.pop();
                 while (!trace.empty() && tryCollapse(trace.pop())) {}
+                return;
             } else {
                 if (data.getInt(nodeInfo.id) < 0) {
                     createChildren(nodeInfo.id);
                 }
-                // TODO: compute child index instead of iterating
-                NodeInfo nextNodeInfo = null;
-                for (int i = 0; i < 8; i++) {
-                    Bounds childBounds = getChildBounds(nodeInfo.bounds, i);
-                    if (childBounds.contains(pos)) {
-                        nextNodeInfo = new NodeInfo(data.getInt(nodeInfo.id + i), childBounds);
-                        break;
-                    }
-                }
-                nodeInfo = nextNodeInfo;
+
+                BlockPos origin = nodeInfo.bounds.getOrigin();
+
+                boolean up = pos.getY() >= origin.getY();
+                boolean east = pos.getX() >= origin.getX();
+                boolean south = pos.getZ() >= origin.getZ();
+
+                int childIndex = getChildIndex(up, east, south);
+                Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
+                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds);
             }
         }
     }
@@ -75,30 +86,30 @@ public class RaycastOctree {
      * @return the value stored at that position, if the position isn't contained by the octree returns false
      */
     public boolean get(BlockPos pos) {
+        LogUtils.getLogger().info("Get {}", pos);
         if (!contains(pos)) return false;
 
         NodeInfo nodeInfo = new NodeInfo(0, getBounds());
 
-        while (nodeInfo != null) {
+        while (true) {
             if (nodeInfo.bounds.isSingleBlock()) {
                 return data.getInt(nodeInfo.id) == -2;
             } else {
                 if (data.getInt(nodeInfo.id) < 0) {
                     return data.getInt(nodeInfo.id) == -2;
                 }
-                // TODO: compute child index instead of iterating
-                NodeInfo nextNodeInfo = null;
-                for (int i = 0; i < 8; i++) {
-                    Bounds childBounds = getChildBounds(nodeInfo.bounds, i);
-                    if (childBounds.contains(pos)) {
-                        nextNodeInfo = new NodeInfo(data.getInt(nodeInfo.id + i), childBounds);
-                        break;
-                    }
-                }
-                nodeInfo = nextNodeInfo;
+
+                BlockPos origin = nodeInfo.bounds.getOrigin();
+
+                boolean up = pos.getY() >= origin.getY();
+                boolean east = pos.getX() >= origin.getX();
+                boolean south = pos.getZ() >= origin.getZ();
+
+                int childIndex = getChildIndex(up, east, south);
+                Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
+                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds);
             }
         }
-        throw new RuntimeException("This really shouldn't happen");
     }
 
     public boolean raycast(Vec3 pos, Vec3 direction) {
@@ -113,20 +124,32 @@ public class RaycastOctree {
     private void expandToContain(BlockPos pos) {
         Bounds bounds = getBounds();
         while (!bounds.contains(pos)) {
+            LogUtils.getLogger().info("expanding");
             boolean up = pos.getY() > bounds.upper;
             boolean east = pos.getX() > bounds.east;
             boolean south = pos.getZ() > bounds.south;
-            int childId = getChildIndex(up, east, south);
+            int childId = getChildIndex(!up, !east, !south);
             int id = createChildren(false);
             data.set(id + childId, data.getInt(0)); // move the root node
             data.set(0, id); // set the root to point at new children
-            sizePower <<= 1;
-            origin = new BlockPos(
-                    up ? bounds.upper + 1 : bounds.lower,
-                    east ? bounds.east + 1 : bounds.west,
-                    south ? bounds.south + 1 : bounds.north
-            );
-            bounds = getBounds();
+            sizePower++;
+            if (up) {
+                bounds.upper = bounds.lower + (1 << sizePower) - 1;
+            } else {
+                bounds.lower = bounds.upper - (1 << sizePower) + 1;
+            }
+            if (east) {
+                bounds.east = bounds.west + (1 << sizePower) - 1;
+            } else {
+                bounds.west = bounds.east - (1 << sizePower) + 1;
+            }
+            if (south) {
+                bounds.south = bounds.north + (1 << sizePower) - 1;
+            } else {
+                bounds.north = bounds.south - (1 << sizePower) + 1;
+            }
+            origin = bounds.getOrigin();
+            printBounds(bounds);
         }
     }
 
@@ -202,6 +225,7 @@ public class RaycastOctree {
         public int north;
 
         public boolean contains(BlockPos pos) {
+            LogUtils.getLogger().info("does contain {}", pos);
             return pos.getY() <= upper && pos.getY() >= lower &&
                     pos.getX() <= east && pos.getX() >= west &&
                     pos.getZ() <= south && pos.getZ() >= north;
@@ -209,9 +233,9 @@ public class RaycastOctree {
 
         public BlockPos getOrigin() {
             return new BlockPos(
-                    west - (east - west) / 2,
-                    lower - (upper - lower) / 2,
-                    north - (south - north) / 2
+                    (east + west + 1) / 2,
+                    (upper + lower + 1) / 2,
+                    (south + north + 1) / 2
             );
         }
 
@@ -238,12 +262,15 @@ public class RaycastOctree {
     private Bounds getBounds() {
         Bounds bounds = new Bounds();
         int size = 1 << sizePower;
-        bounds.upper = size >> 1 - size & 1 + origin.getY();
-        bounds.lower = -size >> 1 + origin.getY();
-        bounds.east = size >> 1 - size & 1 + origin.getX();
-        bounds.west = -size >> 1 + origin.getX();
-        bounds.south = size >> 1 - size & 1 + origin.getZ();
-        bounds.north = -size >> 1 + origin.getZ();
+        LogUtils.getLogger().info("Size: {}", size);
+        int half = size >> 1;
+        bounds.upper = half + origin.getY() - 1 + (size & 1);
+        bounds.lower = -half + origin.getY();
+        bounds.east = half + origin.getX() - 1 + (size & 1);
+        bounds.west = -half + origin.getX();
+        bounds.south = half + origin.getZ() - 1 + (size & 1);
+        bounds.north = -half + origin.getZ();
+        LogUtils.getLogger().info("half: {}", half);
         return bounds;
     }
 
@@ -256,10 +283,22 @@ public class RaycastOctree {
         boolean east = (childIndex >> 1 & 1) != 0;
         boolean south = (childIndex & 1) != 0;
         BlockPos origin = bounds.getOrigin();
+        LogUtils.getLogger().info("Computing child bounds");
+        LogUtils.getLogger().info("origin: {}", origin);
         Bounds childBounds = bounds.copy();
-        if (east) childBounds.west = origin.getY(); else childBounds.east = origin.getY() - 1;
+        if (east) childBounds.west = origin.getX(); else childBounds.east = origin.getX() - 1;
         if (up) childBounds.lower = origin.getY(); else childBounds.upper = origin.getY() - 1;
-        if (south) childBounds.north = origin.getY(); else childBounds.south = origin.getY() - 1;
+        if (south) childBounds.north = origin.getZ(); else childBounds.south = origin.getZ() - 1;
         return childBounds;
+    }
+
+    private static void printBounds(Bounds bounds) {
+        LogUtils.getLogger().info("bounds:");
+        LogUtils.getLogger().info("up - {}", bounds.upper);
+        LogUtils.getLogger().info("down - {}", bounds.lower);
+        LogUtils.getLogger().info("east - {}", bounds.east);
+        LogUtils.getLogger().info("west - {}", bounds.west);
+        LogUtils.getLogger().info("south - {}", bounds.south);
+        LogUtils.getLogger().info("north - {}", bounds.north);
     }
 }

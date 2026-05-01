@@ -37,6 +37,10 @@ import org.boberchik342.CreateStormday.pinwheel.PinwheelItemRenderer;
 import org.boberchik342.CreateStormday.wind.*;
 import org.slf4j.Logger;
 
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
+
 @Mod(CreateStormday.MODID)
 public class CreateStormday {
     public static final String MODID = "create_stormday";
@@ -60,6 +64,27 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onCommonSetup(FMLCommonSetupEvent event) {
             LOGGER.info("Wind breaks crops: {}", Config.windBreaksCrops);
+            RaycastOctree octree = new RaycastOctree();
+            Set<BlockPos> enabled = new HashSet<>();
+            for (int i = 0; i < 10000; i++) {
+                BlockPos pos = new BlockPos(
+                        (int)(Math.random()*100-50),
+                        (int)(Math.random()*100-50),
+                        (int)(Math.random()*100-50)
+                );
+                enabled.add(pos);
+                octree.set(pos, true);
+            }
+            for (int i = 0; i < 100000; i++) {
+                BlockPos pos = new BlockPos(
+                        (int)(Math.random()*100-50),
+                        (int)(Math.random()*100-50),
+                        (int)(Math.random()*100-50)
+                );
+                if (enabled.contains(pos) != octree.get(pos)) {
+                    throw new RuntimeException("Octree didn't pass the test");
+                }
+            }
         }
 
         @SubscribeEvent
