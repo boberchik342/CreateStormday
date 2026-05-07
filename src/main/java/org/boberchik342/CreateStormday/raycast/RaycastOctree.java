@@ -4,13 +4,17 @@ import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
+import org.boberchik342.CreateStormday.wind.WindSystem;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Stack;
 
 public class RaycastOctree {
+    public static boolean frozen = false;
     private int sizePower = 0;
     private BlockPos origin = new BlockPos(0, 0, 0);
     private final IntArrayList data = new IntArrayList();
@@ -558,6 +562,65 @@ public class RaycastOctree {
         }
         if (!octree.structureCheck()) {
             throw new RuntimeException("Octree didn't pass structure test");
+        }
+    }
+
+    public void loadChunk(LevelChunk chunk) {
+        ChunkPos cp = chunk.getPos();
+
+        BlockPos a = new BlockPos(cp.getMinBlockX(), chunk.getMinBuildHeight(), cp.getMinBlockZ());
+        BlockPos b = new BlockPos(cp.getMaxBlockX(), chunk.getMaxBuildHeight(), cp.getMaxBlockZ());
+
+        expandToContain(a);
+        expandToContain(b);
+
+        Bounds chunkBounds = new Bounds();
+        chunkBounds.east = Math.max(a.getX(), b.getX());
+        chunkBounds.south = Math.max(a.getZ(), b.getZ());
+        chunkBounds.upper = Math.max(a.getY(), b.getY());
+        chunkBounds.west = Math.min(a.getX(), b.getX());
+        chunkBounds.north = Math.min(a.getZ(), b.getZ());
+        chunkBounds.lower = Math.min(a.getY(), b.getY());
+
+        Stack<NodeInfo> stack = new Stack<>();
+        Stack<TraceElement> trace = new Stack<>();
+        stack.add(new NodeInfo(0, getBounds(), 0));
+
+        while (!stack.empty()) {
+            NodeInfo nodeInfo = stack.pop();
+            while (trace.size() > nodeInfo.depth) {
+                TraceElement element = trace.pop();
+                if (trace.empty()) continue;
+                if (element.childrenModified && tryCollapse(element.id) && !trace.empty()) {
+                    trace.peek().childrenModified = true;
+                }
+            }
+
+            if (chunkBounds.intersects(nodeInfo.bounds)) {
+                if (nodeInfo.bounds.isSingleBlock()) {
+                    BlockPos pos = new BlockPos(nodeInfo.bounds.east, nodeInfo.bounds.upper, nodeInfo.bounds.south);
+                    data.set(nodeInfo.id, !WindSystem.isBlockWindPassable(chunk.getBlockState(pos)) ? -2 : -1);
+                    if (!trace.empty()) trace.peek().childrenModified = true;
+                    continue;
+                }
+                int val = data.getInt(nodeInfo.id);
+                trace.push(new TraceElement(nodeInfo.id));
+                if (val < 0) {
+                    createChildren(nodeInfo.id);
+                    trace.peek().childrenModified = true;
+                    val = data.getInt(nodeInfo.id);
+                }
+                for (int i = 0; i < 8; i++) {
+                    stack.add(new NodeInfo(val + i, getChildBounds(nodeInfo.bounds, i), nodeInfo.depth + 1));
+                }
+            }
+        }
+        while (!trace.isEmpty()) {
+            TraceElement element = trace.pop();
+            if (trace.empty()) continue;
+            if (element.childrenModified && tryCollapse(element.id) && !trace.empty()) {
+                trace.peek().childrenModified = true;
+            }
         }
     }
 }

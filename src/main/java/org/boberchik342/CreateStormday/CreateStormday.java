@@ -31,6 +31,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.boberchik342.CreateStormday.all.AllBlockEntities;
 import org.boberchik342.CreateStormday.all.AllBlocks;
 import org.boberchik342.CreateStormday.all.AllItems;
+import org.boberchik342.CreateStormday.debug.RaycastDebugCommand;
 import org.boberchik342.CreateStormday.debug.WindDebugRenderer;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelItemExtensions;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelItemRenderer;
@@ -82,7 +83,7 @@ public class CreateStormday {
         public static void onChunkLoad(ChunkEvent.Load event) {
             if (!(event.getChunk() instanceof LevelChunk chunk)) return;
             WindSystem.onChunkLoad(chunk);
-//            RaycastHelper.get(chunk.getLevel()).loadChunk(chunk);
+            RaycastHelper.get(chunk.getLevel()).loadChunk(chunk);
         }
 
         @SubscribeEvent
@@ -112,6 +113,7 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onRegisterCommands(RegisterCommandsEvent event) {
             WindCommand.register(event.getDispatcher());
+            RaycastDebugCommand.register(event.getDispatcher());
         }
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
