@@ -34,12 +34,10 @@ import org.boberchik342.CreateStormday.all.AllItems;
 import org.boberchik342.CreateStormday.debug.WindDebugRenderer;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelItemExtensions;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelItemRenderer;
+import org.boberchik342.CreateStormday.raycast.RaycastHelper;
+import org.boberchik342.CreateStormday.raycast.RaycastOctree;
 import org.boberchik342.CreateStormday.wind.*;
 import org.slf4j.Logger;
-
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
 
 @Mod(CreateStormday.MODID)
 public class CreateStormday {
@@ -64,33 +62,7 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onCommonSetup(FMLCommonSetupEvent event) {
             LOGGER.info("Wind breaks crops: {}", Config.windBreaksCrops);
-            if (!RaycastOctree.boundsLogicCheck()) {
-                throw new RuntimeException("Bounds logic check did not pass");
-            }
-            RaycastOctree octree = new RaycastOctree();
-            Set<BlockPos> enabled = new HashSet<>();
-            for (int i = 0; i < 1000; i++) {
-                BlockPos pos = new BlockPos(
-                        (int)(Math.random()*100-50),
-                        (int)(Math.random()*100-50),
-                        (int)(Math.random()*100-50)
-                );
-                enabled.add(pos);
-                octree.set(pos, true);
-            }
-            for (int i = 0; i < 10000; i++) {
-                BlockPos pos = new BlockPos(
-                        (int)(Math.random()*100-50),
-                        (int)(Math.random()*100-50),
-                        (int)(Math.random()*100-50)
-                );
-                if (enabled.contains(pos) != octree.get(pos)) {
-                    throw new RuntimeException("Octree didn't pass the test");
-                }
-            }
-            if (!octree.structureCheck()) {
-                throw new RuntimeException("Octree didn't pass structure test");
-            }
+            RaycastOctree.test();
         }
 
         @SubscribeEvent
@@ -110,6 +82,7 @@ public class CreateStormday {
         public static void onChunkLoad(ChunkEvent.Load event) {
             if (!(event.getChunk() instanceof LevelChunk chunk)) return;
             WindSystem.onChunkLoad(chunk);
+//            RaycastHelper.get(chunk.getLevel()).loadChunk(chunk);
         }
 
         @SubscribeEvent

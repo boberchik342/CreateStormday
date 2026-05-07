@@ -1,11 +1,10 @@
-package org.boberchik342.CreateStormday.wind;
+package org.boberchik342.CreateStormday.raycast;
 
 import com.mojang.logging.LogUtils;
-import dev.ryanhcode.sable.api.SubLevelHelper;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
 import net.minecraft.world.phys.Vec3;
-import org.boberchik342.CreateStormday.mixin.BlockSubLevelLiftProviderMixin;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,11 +17,13 @@ public class RaycastOctree {
     private final Stack<Integer> freeIndices = new Stack<>();
 
     private static class NodeInfo {
-        public NodeInfo(int id, Bounds bounds) {
+        public NodeInfo(int id, Bounds bounds, int depth) {
             this.id = id;
             this.bounds = bounds;
+            this.depth = depth;
         }
 
+        int depth;
         int id;
         Bounds bounds;
     }
@@ -32,13 +33,12 @@ public class RaycastOctree {
     }
 
     public void set(BlockPos pos, boolean value) {
-        LogUtils.getLogger().info("Set {} to {}", pos, value);
         if (!contains(pos)) {
             if (!value) return;
             expandToContain(pos);
         }
 
-        NodeInfo nodeInfo = new NodeInfo(0, getBounds());
+        NodeInfo nodeInfo = new NodeInfo(0, getBounds(), 0);
         Stack<Integer> trace = new Stack<>(); // used to collapse the nodes
 
         while (true) {
@@ -61,9 +61,47 @@ public class RaycastOctree {
 
                 int childIndex = getChildIndex(up, east, south);
                 Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
-                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds);
+                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
             }
         }
+    }
+
+    private static class TraceElement {
+        int id;
+        boolean childrenModified = false;
+
+        public TraceElement(int id) {
+            this.id = id;
+        }
+    }
+
+    private boolean validateTrace(Stack<TraceElement> trace) {
+        int firstChild = 0;
+        for (int i = 0; i < trace.size(); i++) {
+            TraceElement element = trace.get(i);
+            if (element.id > firstChild + 7 || element.id < firstChild) {
+                LogUtils.getLogger().info("next element in trace is not a child of previous element");
+                if (i == 0) {
+                    LogUtils.getLogger().info("This is the first element in the trace, so most likely this is wrong");
+                } else {
+                    LogUtils.getLogger().info("Previous element: {}", trace.get(i - 1).id);
+                    LogUtils.getLogger().info("Current element: {}", trace.get(i).id);
+                }
+                return false;
+            }
+            int val = data.getInt(element.id);
+            if (val < 0) {
+                if (i == trace.size() - 1) {
+                    return true;
+                } else {
+                    LogUtils.getLogger().info("Not last element is leaf");
+                    return false;
+                }
+            } else {
+                firstChild = val;
+            }
+        }
+        return true;
     }
 
     /**
@@ -72,8 +110,109 @@ public class RaycastOctree {
      * @param b second corner of an area
      * @param value the value to fill the area with
      */
+
     public void fill(BlockPos a, BlockPos b, boolean value) {
-        // TODO: implement ts
+        Bounds fillBounds = new Bounds();
+
+        if (value) {
+            expandToContain(a);
+            expandToContain(b);
+        }
+
+        fillBounds.east = Math.max(a.getX(), b.getX());
+        fillBounds.south = Math.max(a.getZ(), b.getZ());
+        fillBounds.upper = Math.max(a.getY(), b.getY());
+        fillBounds.west = Math.min(a.getX(), b.getX());
+        fillBounds.north = Math.min(a.getZ(), b.getZ());
+        fillBounds.lower = Math.min(a.getY(), b.getY());
+
+        Stack<NodeInfo> stack = new Stack<>();
+        Stack<TraceElement> trace = new Stack<>();
+        stack.add(new NodeInfo(0, getBounds(), 0));
+
+        while (!stack.empty()) {
+            NodeInfo nodeInfo = stack.pop();
+            while (trace.size() > nodeInfo.depth) {
+                trace.pop();
+                if (trace.empty()) continue;
+                TraceElement parent = trace.peek();
+                if (parent.childrenModified && tryCollapse(parent.id)) {
+                    if (trace.size() >= 2) {
+                        trace.get(trace.size() - 2).childrenModified = true;
+                    }
+                }
+            }
+            // TODO: figure out why moving trace.push from here fixed trace validation error
+            if (!validateTrace(trace)) {
+                throw new RuntimeException("Failed trace validation");
+            }
+
+            if (fillBounds.doesContain(nodeInfo.bounds)) {
+                deleteDescendants(nodeInfo.id);
+                data.set(nodeInfo.id, value ? -2 : -1);
+                // TODO: only set modified if actually modified
+                if (!trace.isEmpty()) trace.peek().childrenModified = true;
+            } else if (fillBounds.intersects(nodeInfo.bounds)) {
+                if (nodeInfo.bounds.isSingleBlock()) {
+                    LogUtils.getLogger().info("fill bounds");
+                    printBounds(fillBounds);
+                    LogUtils.getLogger().info("block bounds");
+                    printBounds(nodeInfo.bounds);
+                    throw new RuntimeException("shouldn't happen");
+                }
+                int val = data.getInt(nodeInfo.id);
+                if (val == (value ? -2 : -1)) { // making sure at least one block is going to be modified or else created children will not get collapsed
+                    continue;
+                }
+                trace.push(new TraceElement(nodeInfo.id));
+                if (val < 0) {
+                    LogUtils.getLogger().info("Creating children");
+                    createChildren(nodeInfo.id);
+                    trace.peek().childrenModified = true; // this shouldn't fix it and it didn't
+                    val = data.getInt(nodeInfo.id);
+                }
+                for (int i = 0; i < 8; i++) {
+                    stack.add(new NodeInfo(val + i, getChildBounds(nodeInfo.bounds, i), nodeInfo.depth + 1));
+                }
+            }
+        }
+        while (!trace.isEmpty()) {
+            trace.pop();
+            if (trace.empty()) continue;
+            TraceElement parent = trace.peek();
+            if (parent.childrenModified && tryCollapse(parent.id)) {
+                if (trace.size() >= 2) {
+                    trace.get(trace.size() - 2).childrenModified = true;
+                }
+            }
+        }
+    }
+
+    /**
+     * removes all descendants of a specified node<br>
+     * the node must not be a leaf node<br>
+     * <b>this does not make it stop pointing to a non-existent node</b>
+     * @param id an id of the node whose descendants to delete
+     */
+    private void deleteDescendants(int id) {
+        Stack<Integer> stack = new Stack<>();
+        int val = data.getInt(id);
+        if (val < 0) return;
+        data.set(id, -3);
+        for (int i = 0; i < 8; i++) {
+            stack.add(val + i);
+        }
+        freeIndices.add(val);
+        while (!stack.empty()) {
+            int nodeId = stack.pop();
+            int value = data.getInt(nodeId);
+            if (value >= 0) {
+                for (int i = 0; i < 8; i++) {
+                    stack.add(value + i);
+                }
+                freeIndices.add(value);
+            }
+        }
     }
 
     /**
@@ -82,10 +221,9 @@ public class RaycastOctree {
      * @return the value stored at that position, if the position isn't contained by the octree returns false
      */
     public boolean get(BlockPos pos) {
-        LogUtils.getLogger().info("Get {}", pos);
         if (!contains(pos)) return false;
 
-        NodeInfo nodeInfo = new NodeInfo(0, getBounds());
+        NodeInfo nodeInfo = new NodeInfo(0, getBounds(), 0);
 
         while (true) {
             if (nodeInfo.bounds.isSingleBlock()) {
@@ -103,7 +241,7 @@ public class RaycastOctree {
 
                 int childIndex = getChildIndex(up, east, south);
                 Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
-                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds);
+                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
             }
         }
     }
@@ -120,7 +258,6 @@ public class RaycastOctree {
     private void expandToContain(BlockPos pos) {
         Bounds bounds = getBounds();
         while (!bounds.contains(pos)) {
-//            LogUtils.getLogger().info("expanding");
             boolean up = pos.getY() > bounds.upper;
             boolean east = pos.getX() > bounds.east;
             boolean south = pos.getZ() > bounds.south;
@@ -153,7 +290,8 @@ public class RaycastOctree {
     }
 
     /**
-     * checks if all children can be represented as a single node and removes them if yes
+     * checks if all children can be represented as a single node and removes them if yes<br>
+     * <b>node must not be a leaf node</b>
      * @param id the id of the node to collapse
      * @return true if the node collapsed and false if otherwise
      */
@@ -224,7 +362,6 @@ public class RaycastOctree {
         public int north;
 
         public boolean contains(BlockPos pos) {
-            LogUtils.getLogger().info("does contain {}", pos);
             return pos.getY() <= upper && pos.getY() >= lower &&
                     pos.getX() <= east && pos.getX() >= west &&
                     pos.getZ() <= south && pos.getZ() >= north;
@@ -252,6 +389,17 @@ public class RaycastOctree {
         public boolean isSingleBlock() {
             return south == north && east == west && upper == lower;
         }
+
+        public boolean doesContain(Bounds bounds) {
+            return bounds.lower >= lower && bounds.upper <= upper &&
+                    bounds.west >= west && bounds.east <= east &&
+                    bounds.north >= north && bounds.south <= south;
+        }
+
+        public boolean intersects(Bounds bounds) {
+            return !(bounds.west > east || bounds.lower > upper || bounds.north > south ||
+                    bounds.east < west || bounds.upper < lower || bounds.south < north);
+        }
     }
 
     private boolean contains(BlockPos pos) {
@@ -261,7 +409,6 @@ public class RaycastOctree {
     private Bounds getBounds() {
         Bounds bounds = new Bounds();
         int size = 1 << sizePower;
-        LogUtils.getLogger().info("Size: {}", size);
         int half = size >> 1;
         bounds.upper = half + origin.getY() - 1 + (size & 1);
         bounds.lower = -half + origin.getY();
@@ -269,7 +416,6 @@ public class RaycastOctree {
         bounds.west = -half + origin.getX();
         bounds.south = half + origin.getZ() - 1 + (size & 1);
         bounds.north = -half + origin.getZ();
-        LogUtils.getLogger().info("half: {}", half);
         return bounds;
     }
 
@@ -282,8 +428,6 @@ public class RaycastOctree {
         boolean east = (childIndex >> 1 & 1) != 0;
         boolean south = (childIndex & 1) != 0;
         BlockPos origin = bounds.getOrigin();
-        LogUtils.getLogger().info("Computing child bounds");
-        LogUtils.getLogger().info("origin: {}", origin);
         Bounds childBounds = bounds.copy();
         if (east) childBounds.west = origin.getX(); else childBounds.east = origin.getX() - 1;
         if (up) childBounds.lower = origin.getY(); else childBounds.upper = origin.getY() - 1;
@@ -313,6 +457,7 @@ public class RaycastOctree {
         while (!stack.empty()) {
             int id = stack.pop();
             if (visited.contains(id)) {
+                LogUtils.getLogger().info("A node was visited twice");
                 return false;
             }
             visited.add(id);
@@ -365,8 +510,65 @@ public class RaycastOctree {
                 childBounds.west != -2 || childBounds.east != -1 ||
                 childBounds.north != -2 || childBounds.south != -1
         ) return false;
-        if (childBounds.isSingleBlock()) return false;
+        return !childBounds.isSingleBlock();
+    }
 
-        return true;
+    public static void test() {
+        if (!RaycastOctree.boundsLogicCheck()) {
+            throw new RuntimeException("Bounds logic check did not pass");
+        }
+        RaycastOctree octree = new RaycastOctree();
+        Set<BlockPos> enabled = new HashSet<>();
+        for (int i = 0; i < 1000; i++) {
+            BlockPos pos = new BlockPos(
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50)
+            );
+            enabled.add(pos);
+            octree.set(pos, true);
+        }
+
+        for (int i = 0; i < 100; i++) {
+            BlockPos a = new BlockPos(
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50)
+            );
+            BlockPos b = a.offset(new Vec3i(
+                    (int)(Math.random()*10),
+                    (int)(Math.random()*10),
+                    (int)(Math.random()*10)
+            ));
+            boolean value = Math.random() > 0.5;
+            octree.fill(a, b, value);
+            for (int x = a.getX(); x <= b.getX(); x++) {
+                for (int y = a.getY(); y <= b.getY(); y++) {
+                    for (int z = a.getZ(); z <= b.getZ(); z++) {
+                        if (value) {
+                            enabled.add(new BlockPos(x, y, z));
+                        } else {
+                            enabled.remove(new BlockPos(x, y, z));
+                        }
+
+                    }
+                }
+            }
+            LogUtils.getLogger().info("Fill: {}", i);
+        }
+
+        for (int i = 0; i < 100000; i++) {
+            BlockPos pos = new BlockPos(
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50)
+            );
+            if (enabled.contains(pos) != octree.get(pos)) {
+                throw new RuntimeException("Octree didn't pass the test");
+            }
+        }
+        if (!octree.structureCheck()) {
+            throw new RuntimeException("Octree didn't pass structure test");
+        }
     }
 }

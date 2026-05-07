@@ -216,7 +216,7 @@ public abstract class WindSystem {
         return a * (1 - t) + b * t;
     }
 
-    private static boolean isBlockWindPassable(BlockState state) {
+    public static boolean isBlockWindPassable(BlockState state) {
         return state.isAir() || state.getBlock() instanceof CropBlock;
     }
 
