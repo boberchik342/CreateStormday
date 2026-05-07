@@ -110,7 +110,6 @@ public class RaycastOctree {
      * @param b second corner of an area
      * @param value the value to fill the area with
      */
-
     public void fill(BlockPos a, BlockPos b, boolean value) {
         Bounds fillBounds = new Bounds();
 
@@ -133,18 +132,11 @@ public class RaycastOctree {
         while (!stack.empty()) {
             NodeInfo nodeInfo = stack.pop();
             while (trace.size() > nodeInfo.depth) {
-                trace.pop();
+                TraceElement element = trace.pop();
                 if (trace.empty()) continue;
-                TraceElement parent = trace.peek();
-                if (parent.childrenModified && tryCollapse(parent.id)) {
-                    if (trace.size() >= 2) {
-                        trace.get(trace.size() - 2).childrenModified = true;
-                    }
+                if (element.childrenModified && tryCollapse(element.id) && !trace.empty()) {
+                    trace.peek().childrenModified = true;
                 }
-            }
-            // TODO: figure out why moving trace.push from here fixed trace validation error
-            if (!validateTrace(trace)) {
-                throw new RuntimeException("Failed trace validation");
             }
 
             if (fillBounds.doesContain(nodeInfo.bounds)) {
@@ -177,13 +169,10 @@ public class RaycastOctree {
             }
         }
         while (!trace.isEmpty()) {
-            trace.pop();
+            TraceElement element = trace.pop();
             if (trace.empty()) continue;
-            TraceElement parent = trace.peek();
-            if (parent.childrenModified && tryCollapse(parent.id)) {
-                if (trace.size() >= 2) {
-                    trace.get(trace.size() - 2).childrenModified = true;
-                }
+            if (element.childrenModified && tryCollapse(element.id) && !trace.empty()) {
+                trace.peek().childrenModified = true;
             }
         }
     }
