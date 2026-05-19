@@ -5,7 +5,6 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
-import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
@@ -506,24 +505,12 @@ public class RaycastOctree {
             blockPos = BlockPos.containing(pos);
 
             switch (intersectionSide) {
-                case Direction.UP -> {
-                    blockPos = new BlockPos(blockPos.getX(), upper, blockPos.getZ());
-                }
-                case Direction.DOWN -> {
-                    blockPos = new BlockPos(blockPos.getX(), lower, blockPos.getZ());
-                }
-                case Direction.EAST -> {
-                    blockPos = new BlockPos(east, blockPos.getY(), blockPos.getZ());
-                }
-                case Direction.WEST -> {
-                    blockPos = new BlockPos(west, blockPos.getY(), blockPos.getZ());
-                }
-                case Direction.NORTH -> {
-                    blockPos = new BlockPos(blockPos.getX(), blockPos.getY(), north);
-                }
-                case Direction.SOUTH -> {
-                    blockPos = new BlockPos(blockPos.getX(), blockPos.getY(), south);
-                }
+                case Direction.UP -> blockPos = new BlockPos(blockPos.getX(), upper, blockPos.getZ());
+                case Direction.DOWN -> blockPos = new BlockPos(blockPos.getX(), lower, blockPos.getZ());
+                case Direction.EAST -> blockPos = new BlockPos(east, blockPos.getY(), blockPos.getZ());
+                case Direction.WEST -> blockPos = new BlockPos(west, blockPos.getY(), blockPos.getZ());
+                case Direction.NORTH -> blockPos = new BlockPos(blockPos.getX(), blockPos.getY(), north);
+                case Direction.SOUTH -> blockPos = new BlockPos(blockPos.getX(), blockPos.getY(), south);
             }
 
             if (!contains(blockPos)) return null;
