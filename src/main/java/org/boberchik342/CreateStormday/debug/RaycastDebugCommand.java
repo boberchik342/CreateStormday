@@ -1,22 +1,18 @@
 package org.boberchik342.CreateStormday.debug;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.FloatArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
-import org.boberchik342.CreateStormday.mixin.LevelMixin;
 import org.boberchik342.CreateStormday.raycast.RaycastHelper;
 import org.boberchik342.CreateStormday.raycast.RaycastOctree;
-import org.boberchik342.CreateStormday.wind.ServerWindSystem;
-import org.boberchik342.CreateStormday.wind.WindSystem;
 
 public class RaycastDebugCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
-                Commands.literal("wind")
+                Commands.literal("debug_octree")
                     .requires(source -> source.hasPermission(4))
                     .executes((ctx) -> {
                         ChunkPos cp = new ChunkPos(BlockPos.containing(ctx.getSource().getPosition()));

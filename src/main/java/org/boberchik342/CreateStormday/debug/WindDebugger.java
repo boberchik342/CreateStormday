@@ -25,7 +25,8 @@ import org.joml.Vector3f;
 @EventBusSubscriber(modid = CreateStormday.MODID)
 public class WindDebugger {
     private static boolean windDebug = false;
-    private static int raycasts = 0;
+    private static long windTime = 0;
+    private static double smoothed = 0;
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
@@ -126,8 +127,10 @@ public class WindDebugger {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
-        raycasts = WindSystem.windComputations;
-        WindSystem.windComputations = 0;
+        if (Minecraft.getInstance().isPaused()) return;
+        windTime = WindSystem.windComputeTime;
+        WindSystem.windComputeTime = 0;
+        smoothed = smoothed * 0.95 + windTime * 0.05;
     }
 
     @SubscribeEvent
@@ -135,7 +138,8 @@ public class WindDebugger {
         float strength = WindSystem.get(Minecraft.getInstance().level).getWind().x;
         event.getGuiGraphics().setColor(1, 1, 1, 1);
         event.getGuiGraphics().drawString(Minecraft.getInstance().font, String.valueOf(strength), 20, 20, 0xFFFFFFFF);
-        event.getGuiGraphics().drawString(Minecraft.getInstance().font, String.valueOf(raycasts), 20, 60, 0xFFFFFFFF);
+        event.getGuiGraphics().drawString(Minecraft.getInstance().font, String.valueOf(windTime), 20, 60, 0xFFFFFFFF);
+        event.getGuiGraphics().drawString(Minecraft.getInstance().font, String.valueOf(smoothed), 20, 100, 0xFFFFFFFF);
     }
 
     @SubscribeEvent

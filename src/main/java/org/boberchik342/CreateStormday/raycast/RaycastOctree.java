@@ -3,11 +3,14 @@ package org.boberchik342.CreateStormday.raycast;
 import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.wind.WindSystem;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -239,8 +242,71 @@ public class RaycastOctree {
         }
     }
 
+    @Nullable
+    private NodeInfo getLeafNode(BlockPos pos) {
+        if (!contains(pos)) return null;
+
+        NodeInfo nodeInfo = new NodeInfo(0, getBounds(), 0);
+
+        while (true) {
+            if (nodeInfo.bounds.isSingleBlock()) {
+                return nodeInfo;
+            } else {
+                if (data.getInt(nodeInfo.id) < 0) {
+                    return nodeInfo;
+                }
+
+                BlockPos origin = nodeInfo.bounds.getOrigin();
+
+                boolean up = pos.getY() >= origin.getY();
+                boolean east = pos.getX() >= origin.getX();
+                boolean south = pos.getZ() >= origin.getZ();
+
+                int childIndex = getChildIndex(up, east, south);
+                Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
+                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
+            }
+        }
+    }
+
     public boolean raycast(Vec3 pos, Vec3 direction) {
-        // TODO: implement ts
+        BlockPos blockPos = BlockPos.containing(pos.x, pos.y, pos.z);
+        Bounds bounds = getBounds();
+        if (!bounds.contains(blockPos)) {
+            HitInfo info = bounds.getRayEntry(pos, direction);
+            if (info == null) return false;
+            blockPos = info.blockPos;
+            pos = info.position;
+        }
+
+        while (true) {
+            NodeInfo info = getLeafNode(blockPos);
+            if (info == null) break;
+            bounds = info.bounds;
+            if (data.getInt(info.id) == -2) return true;
+            int xBound = (direction.x > 0 ? bounds.east + 1 : bounds.west);
+            int yBound = (direction.y > 0 ? bounds.upper + 1 : bounds.lower);
+            int zBound = (direction.z > 0 ? bounds.south + 1 : bounds.north);
+            double a = direction.x == 0 ? Double.POSITIVE_INFINITY : (xBound - pos.x) / direction.x;
+            double b = direction.y == 0 ? Double.POSITIVE_INFINITY : (yBound - pos.y) / direction.y;
+            double c = direction.z == 0 ? Double.POSITIVE_INFINITY : (zBound - pos.z) / direction.z;
+            if (a < b && a < c) {
+                pos = pos.add(direction.multiply(a, a, a));
+                pos = new Vec3(xBound, pos.y, pos.z);
+                blockPos = BlockPos.containing(pos);
+                blockPos = new BlockPos(direction.x > 0 ? bounds.east + 1 : bounds.west - 1, blockPos.getY(), blockPos.getZ());
+            } else if (b < c) {
+                pos = pos.add(direction.multiply(b, b, b));
+                pos = new Vec3(pos.x, yBound, pos.z);
+                blockPos = BlockPos.containing(pos);
+                blockPos = new BlockPos(blockPos.getX(), direction.y > 0 ? bounds.upper + 1 : bounds.lower - 1, blockPos.getZ());
+            } else {
+                pos = pos.add(direction.multiply(c, c, c));
+                pos = new Vec3(pos.x, pos.y, zBound);
+                blockPos = BlockPos.containing(pos);
+                blockPos = new BlockPos(blockPos.getX(), blockPos.getY(), direction.z > 0 ? bounds.south + 1 : bounds.north - 1);
+            }
+        }
         return false;
     }
 
@@ -345,6 +411,10 @@ public class RaycastOctree {
         freeIndices.push(id);
     }
 
+    private record HitInfo (Direction side, Vec3 position, BlockPos blockPos) {
+
+    }
+
     // TODO: represent bounds as origin + size
     private static class Bounds {
         public int upper;
@@ -392,6 +462,73 @@ public class RaycastOctree {
         public boolean intersects(Bounds bounds) {
             return !(bounds.west > east || bounds.lower > upper || bounds.north > south ||
                     bounds.east < west || bounds.upper < lower || bounds.south < north);
+        }
+
+        @Nullable
+        public HitInfo getRayEntry(Vec3 pos, Vec3 direction) {
+            BlockPos blockPos = BlockPos.containing(pos);
+
+            double maxDistance = 0;
+            Direction intersectionSide = Direction.UP;
+
+            if (blockPos.getX() < west || blockPos.getX() > east) {
+                if (direction.x == 0) return null;
+                int xBound = direction.x > 0 ? west : east + 1;
+                double distance = (xBound - pos.x) / direction.x;
+                if (distance < 0) return null;
+                if (distance > maxDistance) {
+                    intersectionSide = direction.x > 0 ? Direction.WEST : Direction.EAST;
+                    maxDistance = distance;
+                }
+            }
+            if (blockPos.getY() < lower || blockPos.getY() > upper) {
+                if (direction.y == 0) return null;
+                int yBound = direction.y > 0 ? lower : upper + 1;
+                double distance = (yBound - pos.y) / direction.y;
+                if (distance < 0) return null;
+                if (distance > maxDistance) {
+                    intersectionSide = direction.y > 0 ? Direction.DOWN : Direction.UP;
+                    maxDistance = distance;
+                }
+            }
+            if (blockPos.getZ() < north || blockPos.getZ() > south) {
+                if (direction.z == 0) return null;
+                int zBound = direction.z > 0 ? north : south + 1;
+                double distance = (zBound - pos.z) / direction.z;
+                if (distance < 0) return null;
+                if (distance > maxDistance) {
+                    intersectionSide = direction.z > 0 ? Direction.NORTH : Direction.SOUTH;
+                    maxDistance = distance;
+                }
+            }
+            pos = pos.add(direction.scale(maxDistance));
+
+            blockPos = BlockPos.containing(pos);
+
+            switch (intersectionSide) {
+                case Direction.UP -> {
+                    blockPos = new BlockPos(blockPos.getX(), upper, blockPos.getZ());
+                }
+                case Direction.DOWN -> {
+                    blockPos = new BlockPos(blockPos.getX(), lower, blockPos.getZ());
+                }
+                case Direction.EAST -> {
+                    blockPos = new BlockPos(east, blockPos.getY(), blockPos.getZ());
+                }
+                case Direction.WEST -> {
+                    blockPos = new BlockPos(west, blockPos.getY(), blockPos.getZ());
+                }
+                case Direction.NORTH -> {
+                    blockPos = new BlockPos(blockPos.getX(), blockPos.getY(), north);
+                }
+                case Direction.SOUTH -> {
+                    blockPos = new BlockPos(blockPos.getX(), blockPos.getY(), south);
+                }
+            }
+
+            if (!contains(blockPos)) return null;
+
+            return new HitInfo(intersectionSide, pos, blockPos);
         }
     }
 

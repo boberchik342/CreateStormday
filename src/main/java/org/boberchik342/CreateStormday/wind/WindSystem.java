@@ -15,12 +15,15 @@ import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import org.boberchik342.CreateStormday.Config;
+import org.boberchik342.CreateStormday.raycast.RaycastHelper;
 import org.joml.Vector3d;
 
 import java.util.*;
 import java.util.logging.Logger;
 
 public abstract class WindSystem {
+    public static long windComputeTime;
+
     public static class WindEntry<T> {
         public WindEntry(long created, T value) {
             this.created = created;
@@ -155,41 +158,12 @@ public abstract class WindSystem {
         Vec3 p = pos.getCenter();
         Vector3d vel = getWindVelocity().mul(-1).add(0, 1.5, 0);
         Vec3 dir = new Vec3(vel.x, vel.y, vel.z);
-        boolean hit = false;
-        BlockPos bPos = pos;
-        while (p.y < level.getMaxBuildHeight() && p.y > level.getMinBuildHeight()) {
-            if (!level.isLoaded(bPos)) {
-                break;
-            }
-            BlockState state = level.getBlockState(bPos);
-            if (!isBlockWindPassable(state)) {
-                hit = true;
-                break;
-            }
-
-            int xBound = bPos.getX() + (dir.x > 0 ? 1 : 0);
-            int yBound = bPos.getY() + (dir.y > 0 ? 1 : 0);
-            int zBound = bPos.getZ() + (dir.z > 0 ? 1 : 0);
-            double a = vel.x == 0 ? Double.POSITIVE_INFINITY : (xBound - p.x) / vel.x;
-            double b = vel.y == 0 ? Double.POSITIVE_INFINITY : (yBound - p.y) / vel.y;
-            double c = vel.z == 0 ? Double.POSITIVE_INFINITY : (zBound - p.z) / vel.z;
-
-            if (a < b && a < c) {
-                p = p.add(dir.multiply(a, a, a));
-                p = new Vec3(xBound, p.y, p.z);
-                bPos = new BlockPos(bPos.getX() + (dir.x > 0 ? 1 : -1), bPos.getY(), bPos.getZ());
-            } else if (b < c) {
-                p = p.add(dir.multiply(b, b, b));
-                p = new Vec3(p.x, yBound, p.z);
-                bPos = new BlockPos(bPos.getX(), bPos.getY() + (dir.y > 0 ? 1 : -1), bPos.getZ());
-            } else {
-                p = p.add(dir.multiply(c, c, c));
-                p = new Vec3(p.x, p.y, zBound);
-                bPos = new BlockPos(bPos.getX(), bPos.getY(), bPos.getZ() + (dir.z > 0 ? 1 : -1));
-            }
-        }
 //        LogUtils.getLogger().info("Computed wind");
         windComputations++;
+        long start = System.nanoTime();
+        boolean hit = RaycastHelper.get(level).raycast(p, dir);
+        long elapsed = System.nanoTime() - start;
+        windComputeTime += elapsed;
         return !hit;
     }
 
