@@ -9,6 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -108,6 +109,7 @@ public class CreateStormday {
                 WindPacket.CODEC,
                 ClientPayloadHandler::handleWindPacket
             );
+
         }
 
         @SubscribeEvent
@@ -136,7 +138,8 @@ public class CreateStormday {
             if (entity instanceof Player player) {
                 if (player.getAbilities().flying) return;
             }
-            event.getEntity().addDeltaMovement(system.getWindVelocityAt(entity.level(), BlockPos.containing(entity.position())).scale(1.0/20/100 * Config.windPushStrength));
+            Vec3 r = system.getWindVelocityAt(entity.level(), BlockPos.containing(entity.position())).scale(1.0/20).subtract(entity.getDeltaMovement());
+            event.getEntity().addDeltaMovement(r.scale((double) Config.windPushStrength / 100));
         }
     }
 }

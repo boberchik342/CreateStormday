@@ -5,9 +5,10 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.boberchik342.CreateStormday.CreateStormday;
+import org.jetbrains.annotations.NotNull;
 
 public record WindPacket(float strength, float direction) implements CustomPacketPayload {
-    public static final Type<WindPacket> TYPE = new Type<WindPacket>(CreateStormday.id("wind"));
+    public static final Type<WindPacket> TYPE = new Type<>(CreateStormday.id("wind"));
     public static final StreamCodec<ByteBuf, WindPacket> CODEC = StreamCodec.composite(
             ByteBufCodecs.FLOAT,
             WindPacket::strength,
@@ -16,7 +17,7 @@ public record WindPacket(float strength, float direction) implements CustomPacke
             WindPacket::new
     );
     @Override
-    public Type<? extends CustomPacketPayload> type() {
+    public @NotNull Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 }

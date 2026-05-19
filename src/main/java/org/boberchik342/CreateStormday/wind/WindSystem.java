@@ -9,6 +9,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec2;
@@ -194,7 +195,7 @@ public abstract class WindSystem {
     }
 
     public static boolean isBlockWindPassable(BlockState state) {
-        return state.isAir() || state.getBlock() instanceof CropBlock;
+        return state.isAir() || state.getBlock() instanceof CropBlock || state.getBlock() instanceof SnowLayerBlock;
     }
 
     public static void tickWind(Iterable<ServerLevel> levels) {
