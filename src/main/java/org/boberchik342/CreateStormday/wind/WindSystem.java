@@ -57,6 +57,10 @@ public abstract class WindSystem {
     }
 
     public WindEntry<Double> getBlockWindExposure(Level level, BlockPos pos) {
+        if (Config.windSampleInterval == 1) {
+            return new WindEntry<>(level.getGameTime(), getDirectWindExposure(level, pos).value ? 1. : 0.);
+        }
+
         if (level.isLoaded(pos)) {
             Map<BlockPos, WindEntry<Double>> directExposure = interpolatedWindExposureCache.get((LevelChunk) level.getChunk(pos));
             if (directExposure != null) {
@@ -159,7 +163,6 @@ public abstract class WindSystem {
         Vector3d vel = getWindVelocity().mul(-1).add(0, 1.5, 0);
         Vec3 dir = new Vec3(vel.x, vel.y, vel.z);
 //        LogUtils.getLogger().info("Computed wind");
-        windComputations++;
         long start = System.nanoTime();
         boolean hit = RaycastHelper.get(level).raycast(p, dir);
         long elapsed = System.nanoTime() - start;
@@ -236,7 +239,6 @@ public abstract class WindSystem {
                     BlockState state = chunk.getBlockState(pos);
 
                     if (state.getBlock() instanceof CropBlock) {
-                        LogUtils.getLogger().info("found crop");
                         crops.add(pos);
                     }
                 }
