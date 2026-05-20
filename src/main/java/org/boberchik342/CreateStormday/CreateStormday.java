@@ -1,6 +1,7 @@
 package org.boberchik342.CreateStormday;
 
 import com.mojang.logging.LogUtils;
+import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.SubLevelHelper;
 import dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -38,6 +39,7 @@ import org.boberchik342.CreateStormday.all.AllBlocks;
 import org.boberchik342.CreateStormday.all.AllItems;
 import org.boberchik342.CreateStormday.debug.RaycastDebugCommand;
 import org.boberchik342.CreateStormday.debug.WindDebugRenderer;
+import org.boberchik342.CreateStormday.pinwheel.PinwheelBlockEntityRenderer;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelItemExtensions;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelItemRenderer;
 import org.boberchik342.CreateStormday.raycast.RaycastHelper;
@@ -78,6 +80,10 @@ public class CreateStormday {
             event.registerBlockEntityRenderer(
                     AllBlockEntities.WIND_DEBUG.get(),
                     WindDebugRenderer::new
+            );
+            event.registerBlockEntityRenderer(
+                    AllBlockEntities.PINWHEEL.get(),
+                    PinwheelBlockEntityRenderer::new
             );
         }
 
@@ -154,7 +160,7 @@ public class CreateStormday {
                     }
                 }
             }
-            entity.level().addParticle(ParticleTypes.BUBBLE, pos.x, pos.y, pos.z, 0, 0, 0);
+            // TODO: don't slow down the player
             Vec3 r = system.getWindVelocityAt(entity.level(), BlockPos.containing(pos)).scale(1.0/20).subtract(entity.getDeltaMovement());
             event.getEntity().addDeltaMovement(r.scale((double) Config.windPushStrength / 100));
         }

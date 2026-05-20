@@ -107,7 +107,6 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
         poseStack.translate(-0.5, -(double) 12/16, -0.5);
 
 
-
         itemRenderer.renderModelLists(
                 blades,
                 ItemStack.EMPTY,

@@ -5,6 +5,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.boberchik342.CreateStormday.CreateStormday;
 import org.boberchik342.CreateStormday.debug.WindDebugBlockEntity;
+import org.boberchik342.CreateStormday.pinwheel.PinwheelBlockEntity;
 
 import java.util.function.Supplier;
 
@@ -17,6 +18,14 @@ public class AllBlockEntities {
                     BlockEntityType.Builder.of(
                             WindDebugBlockEntity::new,
                             AllBlocks.WIND_DEBUG.get()
-                    ).build(    null)
+                    ).build(null)
+            );
+
+    public static final Supplier<BlockEntityType<PinwheelBlockEntity>> PINWHEEL =
+            BLOCK_ENTITIES.register("pinwheel", () ->
+                    BlockEntityType.Builder.of(
+                            PinwheelBlockEntity::new,
+                            AllBlocks.PINWHEEL.get()
+                    ).build(null)
             );
 }

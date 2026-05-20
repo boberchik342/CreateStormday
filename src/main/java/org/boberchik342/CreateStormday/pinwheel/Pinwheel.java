@@ -1,9 +1,10 @@
 package org.boberchik342.CreateStormday.pinwheel;
 
-import net.minecraft.world.item.Item;
+import net.minecraft.world.item.BlockItem;
+import org.boberchik342.CreateStormday.all.AllBlocks;
 
-public class Pinwheel extends Item {
-    public Pinwheel(Properties props) {
-        super(props);
+public class Pinwheel extends BlockItem {
+    public Pinwheel(Properties properties) {
+        super(AllBlocks.PINWHEEL.get(), properties);
     }
 }

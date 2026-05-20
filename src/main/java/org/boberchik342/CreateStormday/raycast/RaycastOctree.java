@@ -282,9 +282,6 @@ public class RaycastOctree {
 //            direction = currentSubLevel.logicalPose().transformNormal(direction);
 //            LogUtils.getLogger().info(direction.toString());
         }
-        if (pos.length() > 1000000) {
-            throw new RuntimeException("not in world space");
-        }
         List<SubLevel> subLevels = (List<SubLevel>) SubLevelContainer.getContainer(level).getAllSubLevels();
         if (subLevels != null) {
             for (SubLevel subLevel: subLevels) {
