@@ -160,9 +160,10 @@ public class CreateStormday {
                     }
                 }
             }
-            // TODO: don't slow down the player
-            Vec3 r = system.getWindVelocityAt(entity.level(), BlockPos.containing(pos)).scale(1.0/20).subtract(entity.getDeltaMovement());
-            event.getEntity().addDeltaMovement(r.scale((double) Config.windPushStrength / 100));
+            Vec3 wind = system.getWindVelocityAt(entity.level(), BlockPos.containing(pos));
+            if (wind.length() > 1) {
+                event.getEntity().addDeltaMovement(wind.scale(1.0/20 * (double) Config.windPushStrength / 100));
+            }
         }
     }
 }
