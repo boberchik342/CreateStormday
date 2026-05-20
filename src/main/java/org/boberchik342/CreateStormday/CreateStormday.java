@@ -1,10 +1,14 @@
 package org.boberchik342.CreateStormday;
 
 import com.mojang.logging.LogUtils;
+import dev.ryanhcode.sable.api.SubLevelHelper;
+import dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -39,6 +43,8 @@ import org.boberchik342.CreateStormday.pinwheel.PinwheelItemRenderer;
 import org.boberchik342.CreateStormday.raycast.RaycastHelper;
 import org.boberchik342.CreateStormday.raycast.RaycastOctree;
 import org.boberchik342.CreateStormday.wind.*;
+import org.joml.RoundingMode;
+import org.joml.Vector3i;
 import org.slf4j.Logger;
 
 @Mod(CreateStormday.MODID)
@@ -138,7 +144,18 @@ public class CreateStormday {
             if (entity instanceof Player player) {
                 if (player.getAbilities().flying) return;
             }
-            Vec3 r = system.getWindVelocityAt(entity.level(), BlockPos.containing(entity.position())).scale(1.0/20).subtract(entity.getDeltaMovement());
+            Vec3 pos = entity.position();
+            if (entity instanceof EntityMovementExtension ext) {
+                SubLevel subLevel = ext.sable$getTrackingSubLevel();
+                if (subLevel != null) {
+                    Vec3 plotPos = subLevel.logicalPose().transformPositionInverse(entity.position());
+                    if (subLevel.getPlot().getBoundingBox().contains(new Vector3i(plotPos.x, plotPos.y, plotPos.z, RoundingMode.FLOOR))) {
+                        pos = plotPos;
+                    }
+                }
+            }
+            entity.level().addParticle(ParticleTypes.BUBBLE, pos.x, pos.y, pos.z, 0, 0, 0);
+            Vec3 r = system.getWindVelocityAt(entity.level(), BlockPos.containing(pos)).scale(1.0/20).subtract(entity.getDeltaMovement());
             event.getEntity().addDeltaMovement(r.scale((double) Config.windPushStrength / 100));
         }
     }

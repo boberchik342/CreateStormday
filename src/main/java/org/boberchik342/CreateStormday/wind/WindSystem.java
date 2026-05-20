@@ -165,7 +165,7 @@ public abstract class WindSystem {
         Vec3 dir = new Vec3(vel.x, vel.y, vel.z);
 //        LogUtils.getLogger().info("Computed wind");
         long start = System.nanoTime();
-        boolean hit = RaycastHelper.get(level).raycast(p, dir);
+        boolean hit = RaycastHelper.get(level).raycast(p, dir, level);
         long elapsed = System.nanoTime() - start;
         windComputeTime += elapsed;
         return !hit;

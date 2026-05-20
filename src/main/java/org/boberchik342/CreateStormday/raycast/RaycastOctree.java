@@ -1,19 +1,27 @@
 package org.boberchik342.CreateStormday.raycast;
 
 import com.mojang.logging.LogUtils;
+import com.simibubi.create.foundation.utility.RaycastHelper;
+import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.api.SubLevelHelper;
+import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
+import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
+import dev.ryanhcode.sable.mixin.entity.entities_stick_sublevels.EntityMixin;
+import dev.ryanhcode.sable.sublevel.SubLevel;
+import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.wind.WindSystem;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.Stack;
+import javax.swing.text.html.parser.Entity;
+import java.util.*;
 
 public class RaycastOctree {
     public static boolean frozen = false;
@@ -164,7 +172,6 @@ public class RaycastOctree {
                 }
                 trace.push(new TraceElement(nodeInfo.id));
                 if (val < 0) {
-                    LogUtils.getLogger().info("Creating children");
                     createChildren(nodeInfo.id);
                     trace.peek().childrenModified = true; // this shouldn't fix it and it didn't
                     val = data.getInt(nodeInfo.id);
@@ -268,9 +275,38 @@ public class RaycastOctree {
         }
     }
 
-    public boolean raycast(Vec3 pos, Vec3 direction) {
+    public boolean raycast(Vec3 pos, Vec3 direction, Level level) {
+        SubLevel currentSubLevel = Sable.HELPER.getContaining(level, pos);
+        if (currentSubLevel != null) {
+            pos = currentSubLevel.logicalPose().transformPosition(pos);
+//            direction = currentSubLevel.logicalPose().transformNormal(direction);
+//            LogUtils.getLogger().info(direction.toString());
+        }
+        if (pos.length() > 1000000) {
+            throw new RuntimeException("not in world space");
+        }
+        List<SubLevel> subLevels = (List<SubLevel>) SubLevelContainer.getContainer(level).getAllSubLevels();
+        if (subLevels != null) {
+            for (SubLevel subLevel: subLevels) {
+                Vec3 transformedDir = subLevel.logicalPose().transformNormalInverse(direction);
+                Vec3 transformedPos = subLevel.logicalPose().transformPositionInverse(pos);
+                BoundingBox3ic bb = subLevel.getPlot().getBoundingBox();
+                Bounds b = new Bounds();
+                b.south = bb.maxZ();
+                b.north = bb.minZ();
+                b.upper = bb.maxY();
+                b.lower = bb.minY();
+                b.east = bb.maxX();
+                b.west = bb.minX();
+                if (raycastInBounds(transformedPos, transformedDir, b)) return true;
+            }
+        }
+
+        return raycastInBounds(pos, direction, getBounds());
+    }
+
+    public boolean raycastInBounds(Vec3 pos, Vec3 direction, Bounds bounds) {
         BlockPos blockPos = BlockPos.containing(pos.x, pos.y, pos.z);
-        Bounds bounds = getBounds();
         if (!bounds.contains(blockPos)) {
             HitInfo info = bounds.getRayEntry(pos, direction);
             if (info == null) return false;
@@ -278,14 +314,14 @@ public class RaycastOctree {
             pos = info.position;
         }
 
-        while (true) {
+        while (bounds.contains(blockPos)) {
             NodeInfo info = getLeafNode(blockPos);
             if (info == null) break;
-            bounds = info.bounds;
+            Bounds nodeBounds = info.bounds;
             if (data.getInt(info.id) == -2) return true;
-            int xBound = (direction.x > 0 ? bounds.east + 1 : bounds.west);
-            int yBound = (direction.y > 0 ? bounds.upper + 1 : bounds.lower);
-            int zBound = (direction.z > 0 ? bounds.south + 1 : bounds.north);
+            int xBound = (direction.x > 0 ? nodeBounds.east + 1 : nodeBounds.west);
+            int yBound = (direction.y > 0 ? nodeBounds.upper + 1 : nodeBounds.lower);
+            int zBound = (direction.z > 0 ? nodeBounds.south + 1 : nodeBounds.north);
             double a = direction.x == 0 ? Double.POSITIVE_INFINITY : (xBound - pos.x) / direction.x;
             double b = direction.y == 0 ? Double.POSITIVE_INFINITY : (yBound - pos.y) / direction.y;
             double c = direction.z == 0 ? Double.POSITIVE_INFINITY : (zBound - pos.z) / direction.z;
@@ -293,17 +329,17 @@ public class RaycastOctree {
                 pos = pos.add(direction.multiply(a, a, a));
                 pos = new Vec3(xBound, pos.y, pos.z);
                 blockPos = BlockPos.containing(pos);
-                blockPos = new BlockPos(direction.x > 0 ? bounds.east + 1 : bounds.west - 1, blockPos.getY(), blockPos.getZ());
+                blockPos = new BlockPos(direction.x > 0 ? nodeBounds.east + 1 : nodeBounds.west - 1, blockPos.getY(), blockPos.getZ());
             } else if (b < c) {
                 pos = pos.add(direction.multiply(b, b, b));
                 pos = new Vec3(pos.x, yBound, pos.z);
                 blockPos = BlockPos.containing(pos);
-                blockPos = new BlockPos(blockPos.getX(), direction.y > 0 ? bounds.upper + 1 : bounds.lower - 1, blockPos.getZ());
+                blockPos = new BlockPos(blockPos.getX(), direction.y > 0 ? nodeBounds.upper + 1 : nodeBounds.lower - 1, blockPos.getZ());
             } else {
                 pos = pos.add(direction.multiply(c, c, c));
                 pos = new Vec3(pos.x, pos.y, zBound);
                 blockPos = BlockPos.containing(pos);
-                blockPos = new BlockPos(blockPos.getX(), blockPos.getY(), direction.z > 0 ? bounds.south + 1 : bounds.north - 1);
+                blockPos = new BlockPos(blockPos.getX(), blockPos.getY(), direction.z > 0 ? nodeBounds.south + 1 : nodeBounds.north - 1);
             }
         }
         return false;

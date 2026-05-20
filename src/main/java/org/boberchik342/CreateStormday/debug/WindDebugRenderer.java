@@ -2,6 +2,7 @@ package org.boberchik342.CreateStormday.debug;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import dev.ryanhcode.sable.Sable;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -27,7 +28,6 @@ public class WindDebugRenderer implements BlockEntityRenderer<WindDebugBlockEnti
     ) {
         Level level = be.getLevel();
         if (level == null) return;
-
         VertexConsumer vc = buffer.getBuffer(RenderType.translucent());
 
         poseStack.pushPose();
@@ -108,6 +108,5 @@ public class WindDebugRenderer implements BlockEntityRenderer<WindDebugBlockEnti
         vc.addVertex(m, x4, y4, z4).setColor(r, g, b, 1).setNormal(n.getX(), n.getY(), n.getZ()).setUv(0, 0).setLight(0xF000F0);
         vc.addVertex(m, x3, y3, z3).setColor(r, g, b, 1).setNormal(n.getX(), n.getY(), n.getZ()).setUv(0, 0).setLight(0xF000F0);
         vc.addVertex(m, x2, y2, z2).setColor(r, g, b, 1).setNormal(n.getX(), n.getY(), n.getZ()).setUv(0, 0).setLight(0xF000F0);
-
     }
 }
