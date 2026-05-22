@@ -2,6 +2,7 @@ package org.boberchik342.CreateStormday.debug;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -22,6 +23,8 @@ import org.boberchik342.CreateStormday.wind.WindSystem;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import java.util.Objects;
+
 @EventBusSubscriber(modid = CreateStormday.MODID)
 public class WindDebugger {
     private static boolean windDebug = false;
@@ -38,6 +41,9 @@ public class WindDebugger {
     }
 
     private static void renderSamples(ClientLevel level, Vec3 cam, PoseStack poseStack) {
+//        LogUtils.getLogger().info("LEVEL");
+//        LogUtils.getLogger().info(Objects.toIdentityString(level));
+
         WindSystem wind = WindSystem.get(level);
 
         VertexConsumer vc = Minecraft.getInstance()

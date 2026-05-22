@@ -49,7 +49,7 @@ public class ServerWindSystem extends WindSystem {
     public void tick(Level level) {
         if (custom) return;
         double strengthNoise = (noise.noise((double) level.getGameTime() / 500, 0, 0) + 1) / 2;
-        strength = (float) (Math.pow(strengthNoise, 4) * 20);
+        strength = (float) (Math.pow(strengthNoise, 4) * (level.isThundering() ? 30 : 9));
         double directionNoise = noise.noise((double) level.getGameTime() / 500, 100, 100);
         direction = (float) ((directionNoise + 1) * Math.PI);
         PacketDistributor.sendToPlayersInDimension((ServerLevel) level, new WindPacket(strength, direction));

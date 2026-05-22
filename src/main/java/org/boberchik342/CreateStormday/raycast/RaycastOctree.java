@@ -13,6 +13,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -282,8 +283,9 @@ public class RaycastOctree {
 //            direction = currentSubLevel.logicalPose().transformNormal(direction);
 //            LogUtils.getLogger().info(direction.toString());
         }
+
         List<SubLevel> subLevels = (List<SubLevel>) SubLevelContainer.getContainer(level).getAllSubLevels();
-        if (subLevels != null) {
+        if (subLevels != null && !subLevels.isEmpty()) {
             for (SubLevel subLevel: subLevels) {
                 Vec3 transformedDir = subLevel.logicalPose().transformNormalInverse(direction);
                 Vec3 transformedPos = subLevel.logicalPose().transformPositionInverse(pos);
@@ -722,7 +724,7 @@ public class RaycastOctree {
         }
     }
 
-    public void loadChunk(LevelChunk chunk) {
+    public void loadChunk(LevelChunk chunk, boolean debug) {
         ChunkPos cp = chunk.getPos();
 
         BlockPos a = new BlockPos(cp.getMinBlockX(), chunk.getMinBuildHeight(), cp.getMinBlockZ());
@@ -738,6 +740,8 @@ public class RaycastOctree {
         chunkBounds.west = Math.min(a.getX(), b.getX());
         chunkBounds.north = Math.min(a.getZ(), b.getZ());
         chunkBounds.lower = Math.min(a.getY(), b.getY());
+
+        if (debug) printBounds(chunkBounds);
 
         Stack<NodeInfo> stack = new Stack<>();
         Stack<TraceElement> trace = new Stack<>();

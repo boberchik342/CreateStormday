@@ -6,7 +6,7 @@
   "mixins": [
     "BlockSubLevelLiftProviderMixin",
     "LevelChunkMixin",
-    "LevelMixin",
+    "ServerLevelPlotMixin",
     "ServerSubLevelMixin"
   ],
   "client": [

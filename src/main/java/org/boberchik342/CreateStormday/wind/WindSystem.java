@@ -1,6 +1,13 @@
 package org.boberchik342.CreateStormday.wind;
 
 import com.mojang.logging.LogUtils;
+import dev.ryanhcode.sable.SableCommonEvents;
+import dev.ryanhcode.sable.api.block.BlockSubLevelLiftProvider;
+import dev.ryanhcode.sable.api.event.SablePrePhysicsTickEvent;
+import dev.ryanhcode.sable.mixin.plot.ServerChunkCacheMixin;
+import dev.ryanhcode.sable.platform.SableChunkEventPlatform;
+import dev.ryanhcode.sable.platform.SableEventPlatform;
+import dev.ryanhcode.sable.platform.SableEventPublishPlatform;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
@@ -195,7 +202,7 @@ public abstract class WindSystem {
     }
 
     public static boolean isBlockWindPassable(BlockState state) {
-        return state.isAir() || state.getBlock() instanceof CropBlock || state.getBlock() instanceof SnowLayerBlock;
+        return state.isAir() || state.getBlock() instanceof CropBlock || state.getBlock() instanceof SnowLayerBlock || state.getBlock() instanceof BlockSubLevelLiftProvider;
     }
 
     public static void tickWind(Iterable<ServerLevel> levels) {

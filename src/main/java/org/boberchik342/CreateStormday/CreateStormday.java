@@ -2,20 +2,17 @@ package org.boberchik342.CreateStormday;
 
 import com.mojang.logging.LogUtils;
 import dev.ryanhcode.sable.Sable;
-import dev.ryanhcode.sable.api.SubLevelHelper;
 import dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -54,7 +51,6 @@ public class CreateStormday {
     public static final String MODID = "create_stormday";
     private static final Logger LOGGER = LogUtils.getLogger();
 
-
     public CreateStormday(IEventBus modEventBus, ModContainer modContainer) {
         AllBlocks.BLOCKS.register(modEventBus);
         AllBlockEntities.BLOCK_ENTITIES.register(modEventBus);
@@ -67,8 +63,8 @@ public class CreateStormday {
         return ResourceLocation.fromNamespaceAndPath(CreateStormday.MODID, name);
     }
 
-    @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
-    public static class ClientModEvents {
+    @EventBusSubscriber(modid = MODID)
+    public static class ModEvents {
         @SubscribeEvent
         public static void onCommonSetup(FMLCommonSetupEvent event) {
             LOGGER.info("Wind breaks crops: {}", Config.windBreaksCrops);
@@ -96,7 +92,12 @@ public class CreateStormday {
         public static void onChunkLoad(ChunkEvent.Load event) {
             if (!(event.getChunk() instanceof LevelChunk chunk)) return;
             WindSystem.onChunkLoad(chunk);
-            RaycastHelper.get(chunk.getLevel()).loadChunk(chunk);
+            boolean debug = false;
+            if (!chunk.getLevel().isClientSide() && Sable.HELPER.isInPlotGrid(chunk.getLevel(), chunk.getPos())) {
+                LOGGER.info("aboba");
+                debug = true;
+            }
+            RaycastHelper.get(chunk.getLevel()).loadChunk(chunk, debug);
         }
 
         @SubscribeEvent
