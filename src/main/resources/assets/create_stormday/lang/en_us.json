@@ -1,4 +1,7 @@
 {
   "create_stormday.configuration.wind_breaks_crops": "Wind breaks crops",
-  "create_stormday.configuration.wind_particle_spawn_area_size": "Wind particle spawn area size"
+  "create_stormday.configuration.wind_particle_spawn_area_size": "Wind particle spawn area size",
+  "block.create_stormday.pinwheel": "Pinwheel",
+  "block.create_stormday.wind_debug": "Wind Debug",
+  "item.create_stormday.pinwheel": "Pinwheel"
 }
