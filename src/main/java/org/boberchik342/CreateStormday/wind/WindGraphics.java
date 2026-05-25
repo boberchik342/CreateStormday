@@ -24,23 +24,18 @@ public class WindGraphics {
 
         Vec3 playerPos = mc.player.position();
 
-        float direction = wind.y;
-        float strength = wind.x;
-
         if (Config.enableWindParticles) {
-            spawnWindParticles(direction, strength, playerPos, level);
+            spawnWindParticles(wind, playerPos, level);
         }
 
         if (Config.enableGroundParticles) {
-            spawnGroundParticles(direction, strength, playerPos, level);
+            spawnGroundParticles(wind, playerPos, level);
         }
     }
 
-    private static void spawnWindParticles(float direction, float strength, Vec3 playerPos, Level level) {
-        double vx = Math.cos(direction) * strength;
-        double vz = Math.sin(direction) * strength;
+    private static void spawnWindParticles(Vec2 wind, Vec3 playerPos, Level level) {
         int volume = Config.windParticleSpawnAreaSize * Config.windParticleSpawnAreaSize * Config.windParticleSpawnAreaSize;
-        for (int i = 0; i < Math.min(Math.pow(Math.max(strength - 0.5, 0), 1.5) * volume / 2000, 1000); i++) {
+        for (int i = 0; i < Math.min(Math.pow(Math.max(wind.length() - 0.5, 0), 1.5) * volume / 2000, 1000); i++) {
             double x = playerPos.x + (level.random.nextDouble() - 0.5) * 200;
             double y = playerPos.y + (level.random.nextDouble() - 0.5) * 200;
             double z = playerPos.z + (level.random.nextDouble() - 0.5) * 200;
@@ -51,18 +46,16 @@ public class WindGraphics {
             level.addParticle(
                     ParticleTypes.CLOUD,
                     x, y, z,
-                    vx + jitterX,
+                    wind.x + jitterX,
                     0,
-                    vz + jitterZ
+                    wind.y + jitterZ
             );
         }
     }
 
-    private static void spawnGroundParticles(float direction, float strength, Vec3 playerPos, Level level) {
-        double vx = Math.cos(direction) * strength;
-        double vz = Math.sin(direction) * strength;
+    private static void spawnGroundParticles(Vec2 wind, Vec3 playerPos, Level level) {
         int volume = (int) Math.pow(Config.groundParticleSpawnAreaSize * 2 + 1, 3);
-        for (int i = 0; i < volume * strength / 64; i++) {
+        for (int i = 0; i < volume * wind.length() / 64; i++) {
             BlockPos pos = new BlockPos(
                     (int) playerPos.x + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize,
                     (int) playerPos.y + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize,
@@ -89,7 +82,7 @@ public class WindGraphics {
                             sidePos.getX() + offset.x,
                             sidePos.getY() + offset.y,
                             sidePos.getZ() + offset.z,
-                            vx, 10, vz
+                            wind.x, 10, wind.y
                     );
                 }
             }
