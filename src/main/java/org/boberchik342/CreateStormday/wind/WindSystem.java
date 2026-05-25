@@ -18,7 +18,7 @@ import java.util.*;
 public class WindSystem {
     public static long windComputeTime;
     public WindAirflowProvider windProvider;
-    private List<AirflowProvider> airflowProviders = new ArrayList<>();
+    private final List<AirflowProvider> airflowProviders = new ArrayList<>();
 
 
     public static class CacheEntry<T> {

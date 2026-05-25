@@ -26,12 +26,12 @@ public class PinwheelBlock extends Block implements EntityBlock {
     }
 
     @Override
-    public @Nullable BlockEntity newBlockEntity(BlockPos blockPos, BlockState blockState) {
+    public @Nullable BlockEntity newBlockEntity(@NotNull BlockPos blockPos, @NotNull BlockState blockState) {
         return new PinwheelBlockEntity(blockPos, blockState);
     }
 
     @Override
-    public @Nullable <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> blockEntityType) {
+    public @Nullable <T extends BlockEntity> BlockEntityTicker<T> getTicker(@NotNull Level level, @NotNull BlockState state, @NotNull BlockEntityType<T> blockEntityType) {
         return createTickerHelper(blockEntityType, AllBlockEntities.PINWHEEL.get(), PinwheelBlockEntity::tick);
     }
 
@@ -41,7 +41,7 @@ public class PinwheelBlock extends Block implements EntityBlock {
     }
 
     @Override
-    public boolean propagatesSkylightDown(BlockState state, BlockGetter level, BlockPos pos) {
+    public boolean propagatesSkylightDown(@NotNull BlockState state, @NotNull BlockGetter level, @NotNull BlockPos pos) {
         return true;
     }
 }

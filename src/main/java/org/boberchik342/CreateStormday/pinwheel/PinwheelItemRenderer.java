@@ -12,13 +12,13 @@ import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.client.resources.model.ModelResourceLocation;
-import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.CreateStormday;
 import org.boberchik342.CreateStormday.wind.WindSystem;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.WeakHashMap;
 
@@ -40,7 +40,7 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
         public float speed;
         public float rotation;
     }
-    private static State fpState = new State();
+    private static final State fpState = new State();
     private static final WeakHashMap<Level, State> states = new WeakHashMap<>();
 
     public PinwheelItemRenderer(BlockEntityRenderDispatcher dispatcher, EntityModelSet set) {
@@ -75,10 +75,10 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
     }
 
     @Override
-    public void renderByItem(ItemStack stack,
-                             ItemDisplayContext context,
-                             PoseStack poseStack,
-                             MultiBufferSource buffer,
+    public void renderByItem(@NotNull ItemStack stack,
+                             @NotNull ItemDisplayContext context,
+                             @NotNull PoseStack poseStack,
+                             @NotNull MultiBufferSource buffer,
                              int light,
                              int overlay) {
         float pt = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true);
