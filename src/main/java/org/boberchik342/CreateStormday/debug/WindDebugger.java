@@ -41,8 +41,6 @@ public class WindDebugger {
     }
 
     private static void renderSamples(ClientLevel level, Vec3 cam, PoseStack poseStack) {
-//        LogUtils.getLogger().info("LEVEL");
-//        LogUtils.getLogger().info(Objects.toIdentityString(level));
 
         WindSystem wind = WindSystem.get(level);
 
