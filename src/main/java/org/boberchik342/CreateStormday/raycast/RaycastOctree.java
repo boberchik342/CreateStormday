@@ -321,7 +321,11 @@ public class RaycastOctree {
             pos = currentSubLevel.logicalPose().transformPosition(pos);
         }
 
-        List<SubLevel> subLevels = (List<SubLevel>) SubLevelContainer.getContainer(level).getAllSubLevels();
+        SubLevelContainer container = SubLevelContainer.getContainer(level);
+        List<SubLevel> subLevels;
+        if (container != null) subLevels = (List<SubLevel>) container.getAllSubLevels();
+        else subLevels = new ArrayList<>();
+
         if (subLevels != null && !subLevels.isEmpty()) {
             for (SubLevel subLevel: subLevels) {
                 Vec3 transformedDir = subLevel.logicalPose().transformNormalInverse(direction);
