@@ -1,8 +1,12 @@
 package org.boberchik342.CreateStormday;
 
 import com.mojang.logging.LogUtils;
+import com.simibubi.create.content.kinetics.chainDrive.ChainDriveBlock;
 import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.command.SableJointCommands;
 import dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension;
+import dev.ryanhcode.sable.physics.impl.rapier.Rapier3D;
+import dev.ryanhcode.sable.physics.impl.rapier.constraint.generic.RapierGenericConstraintHandle;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.item.ItemProperties;
@@ -161,7 +165,7 @@ public class CreateStormday {
                     }
                 }
             }
-            Vec3 wind = system.getWindVelocityAt(entity.level(), BlockPos.containing(pos));
+            Vec3 wind = system.getWind(entity.level(), pos);
             if (wind.length() > 1) {
                 event.getEntity().addDeltaMovement(wind.scale(1.0/20 * (double) Config.windPushStrength / 100));
             }

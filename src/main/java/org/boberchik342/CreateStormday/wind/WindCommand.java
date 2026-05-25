@@ -18,7 +18,7 @@ public class WindCommand {
                                 float direction = FloatArgumentType.getFloat(ctx, "direction");
 
                                 var level = ctx.getSource().getLevel();
-                                ServerWindSystem system = (ServerWindSystem) WindSystem.get(level);
+                                ServerWindAirflowProvider system = (ServerWindAirflowProvider) WindSystem.get(level).windProvider;
                                 system.setWind(level, strength, direction);
 
                                 return 1;
@@ -28,7 +28,7 @@ public class WindCommand {
                 ).then(Commands.literal("reset")
                     .executes(ctx -> {
                         var level = ctx.getSource().getLevel();
-                        ServerWindSystem system = (ServerWindSystem) WindSystem.get(level);
+                        ServerWindAirflowProvider system = (ServerWindAirflowProvider) WindSystem.get(level).windProvider;
                         system.resetWind();
                         return 1;
                     })

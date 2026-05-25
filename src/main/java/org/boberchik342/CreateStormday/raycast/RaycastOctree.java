@@ -1,27 +1,24 @@
 package org.boberchik342.CreateStormday.raycast;
 
 import com.mojang.logging.LogUtils;
-import com.simibubi.create.foundation.utility.RaycastHelper;
 import dev.ryanhcode.sable.Sable;
-import dev.ryanhcode.sable.api.SubLevelHelper;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
-import dev.ryanhcode.sable.mixin.entity.entities_stick_sublevels.EntityMixin;
 import dev.ryanhcode.sable.sublevel.SubLevel;
-import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Tuple;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
+import org.boberchik342.CreateStormday.wind.WindAirflowProvider;
 import org.boberchik342.CreateStormday.wind.WindSystem;
 import org.jetbrains.annotations.Nullable;
+import org.w3c.dom.Node;
 
-import javax.swing.text.html.parser.Entity;
 import java.util.*;
 
 public class RaycastOctree {
@@ -276,12 +273,52 @@ public class RaycastOctree {
         }
     }
 
+    private Tuple<@Nullable NodeInfo, Stack<NodeInfo>> getLeafNode(BlockPos pos, Stack<NodeInfo> stack) {
+        if (!contains(pos)) return null;
+
+        while (!stack.empty() && !stack.peek().bounds.contains(pos)) {
+            stack.pop();
+        }
+
+        if (stack.empty()) {
+            throw new IllegalArgumentException("The first element of the stack must be the root node");
+        }
+
+        NodeInfo nodeInfo = stack.pop();
+
+        while (true) {
+            stack.add(nodeInfo);
+
+            if (nodeInfo.bounds.isSingleBlock()) {
+                return new Tuple<>(nodeInfo, stack);
+            } else {
+                if (data.getInt(nodeInfo.id) < 0) {
+                    return new Tuple<>(nodeInfo, stack);
+                }
+
+                BlockPos origin = nodeInfo.bounds.getOrigin();
+
+                boolean up = pos.getY() >= origin.getY();
+                boolean east = pos.getX() >= origin.getX();
+                boolean south = pos.getZ() >= origin.getZ();
+
+                int childIndex = getChildIndex(up, east, south);
+                Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
+                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
+            }
+        }
+    }
+
+    /**
+     * @param pos the position to raycast from
+     * @param direction the direction to raycast in
+     * @param level the level to raycast in
+     * @return true if the ray hits a block and false if otherwise
+     */
     public boolean raycast(Vec3 pos, Vec3 direction, Level level) {
         SubLevel currentSubLevel = Sable.HELPER.getContaining(level, pos);
         if (currentSubLevel != null) {
             pos = currentSubLevel.logicalPose().transformPosition(pos);
-//            direction = currentSubLevel.logicalPose().transformNormal(direction);
-//            LogUtils.getLogger().info(direction.toString());
         }
 
         List<SubLevel> subLevels = (List<SubLevel>) SubLevelContainer.getContainer(level).getAllSubLevels();
@@ -304,7 +341,7 @@ public class RaycastOctree {
         return raycastInBounds(pos, direction, getBounds());
     }
 
-    public boolean raycastInBounds(Vec3 pos, Vec3 direction, Bounds bounds) {
+    private boolean raycastInBounds(Vec3 pos, Vec3 direction, Bounds bounds) {
         BlockPos blockPos = BlockPos.containing(pos.x, pos.y, pos.z);
         if (!bounds.contains(blockPos)) {
             HitInfo info = bounds.getRayEntry(pos, direction);
@@ -313,8 +350,13 @@ public class RaycastOctree {
             pos = info.position;
         }
 
+        Stack<NodeInfo> stack = new Stack<>();
+        stack.add(new NodeInfo(0, getBounds(), 0));
+
         while (bounds.contains(blockPos)) {
-            NodeInfo info = getLeafNode(blockPos);
+            Tuple<NodeInfo, Stack<NodeInfo>> tuple = getLeafNode(blockPos, stack);
+            assert tuple != null;
+            NodeInfo info = tuple.getA();
             if (info == null) break;
             Bounds nodeBounds = info.bounds;
             if (data.getInt(info.id) == -2) return true;
@@ -760,7 +802,7 @@ public class RaycastOctree {
             if (chunkBounds.intersects(nodeInfo.bounds)) {
                 if (nodeInfo.bounds.isSingleBlock()) {
                     BlockPos pos = new BlockPos(nodeInfo.bounds.east, nodeInfo.bounds.upper, nodeInfo.bounds.south);
-                    data.set(nodeInfo.id, !WindSystem.isBlockWindPassable(chunk.getBlockState(pos)) ? -2 : -1);
+                    data.set(nodeInfo.id, !WindAirflowProvider.isBlockWindPassable(chunk.getBlockState(pos)) ? -2 : -1);
                     if (!trace.empty()) trace.peek().childrenModified = true;
                     continue;
                 }

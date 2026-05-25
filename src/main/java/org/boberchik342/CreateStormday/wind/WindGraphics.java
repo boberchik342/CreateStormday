@@ -12,13 +12,15 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.Config;
+import org.joml.Vector3d;
 
 public class WindGraphics {
     public static void spawnParticles(Minecraft mc) {
         ClientLevel level = mc.level;
         if (mc.level == null || mc.player == null) return;
 
-        Vec2 wind = WindSystem.get(level).getWind();
+        Vector3d windVelocity = WindSystem.get(level).windProvider.getWindVelocity();
+        Vec2 wind = new Vec2((float) windVelocity.x, (float) windVelocity.z);
 
         Vec3 playerPos = mc.player.position();
 
@@ -66,7 +68,7 @@ public class WindGraphics {
                     (int) playerPos.y + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize,
                     (int) playerPos.z + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize
             );
-            if (WindSystem.get(level).getBlockWindExposure(level, pos).value > 0.9) {
+            if (WindSystem.get(level).getWind(level, pos.getCenter()).length() > 5) {
                 BlockState state = level.getBlockState(pos);
                 if (!state.isAir()) continue;
                 for (var dir : Direction.values()) {

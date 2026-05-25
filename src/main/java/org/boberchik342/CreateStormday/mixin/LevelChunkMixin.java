@@ -7,6 +7,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.boberchik342.CreateStormday.raycast.RaycastHelper;
 import org.boberchik342.CreateStormday.raycast.RaycastOctree;
+import org.boberchik342.CreateStormday.wind.WindAirflowProvider;
 import org.boberchik342.CreateStormday.wind.WindSystem;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,8 +28,8 @@ public class LevelChunkMixin {
     @Inject(method = "setBlockState", at = @At(value = "TAIL"))
     public void trackCrops(BlockPos pos, BlockState state, boolean p_62867_, CallbackInfoReturnable<BlockState> cir) {
         if (!RaycastOctree.frozen) {
-            boolean old = WindSystem.isBlockWindPassable(cir.getReturnValue());
-            boolean passable = WindSystem.isBlockWindPassable(state);
+            boolean old = WindAirflowProvider.isBlockWindPassable(cir.getReturnValue());
+            boolean passable = WindAirflowProvider.isBlockWindPassable(state);
             if (old != passable) {
                 RaycastHelper.get(((LevelChunk) (Object) this).getLevel()).set(pos, !passable);
             }

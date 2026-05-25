@@ -32,15 +32,8 @@ public interface BlockSubLevelLiftProviderMixin {
         Vector3d worldPos = new Vector3d();
         subLevel.logicalPose().transformPosition(LIFT_POS, worldPos);
         BlockPos pos = BlockPos.containing(worldPos.x, worldPos.y, worldPos.z);
-        Vec3 windVel = windSystem.getWindVelocityAt(subLevel.getLevel(), pos);
-//        LogUtils.getLogger().info(pos.toString());
-//        LogUtils.getLogger().info(windVel.toString());
-//        LogUtils.getLogger().info(windSystem.getDirectWindExposure(subLevel.getLevel(), pos).value.toString());
-//        LogUtils.getLogger().info(Objects.toIdentityString(subLevel.getLevel()));
+        Vec3 windVel = windSystem.getWind(subLevel.getLevel(), new Vec3(worldPos.x, worldPos.y, worldPos.z));
         subLevel.getLevel().addParticle(ParticleTypes.BUBBLE, pos.getCenter().x, pos.getCenter().y, pos.getCenter().z, 0, 0, 0);
         LIFT_VELO.sub(new Vector3d(windVel.x, windVel.y, windVel.z));
-//        LIFT_VELO.sub(windSystem.getWindVelocity());
-
-//        LogUtils.getLogger().error("Stack trace:", new Exception());
     }
 }

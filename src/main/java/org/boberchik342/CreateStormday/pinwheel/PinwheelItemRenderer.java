@@ -50,9 +50,9 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
     public static void tick() {
         // ts prob works fr fr no cap i think maybe hopefully probably
         if (Minecraft.getInstance().level == null) return;
-        Vec3 windVel = WindSystem.get(Minecraft.getInstance().level).getWindVelocityAt(
+        Vec3 windVel = WindSystem.get(Minecraft.getInstance().level).getWind(
                 Minecraft.getInstance().level,
-                BlockPos.containing(Minecraft.getInstance().player.getPosition(1))
+                Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getPosition(1) : Vec3.ZERO
         );
         Vec3 playerVel = new Vec3(0, 0, 0);
         if (Minecraft.getInstance().player != null) {
@@ -69,7 +69,7 @@ public class PinwheelItemRenderer extends BlockEntityWithoutLevelRenderer {
         if (Minecraft.getInstance().level == null) return;
         for (var state : states.values()) {
             state.next();
-            state.speed = (float) (state.speed * 0.9 + WindSystem.get(Minecraft.getInstance().level).getWind().x * 0.1);
+            state.speed = (float) (state.speed * 0.9 + WindSystem.get(Minecraft.getInstance().level).windProvider.getMaxWindSpeed() * 0.1);
             state.rotation += state.speed;
         }
     }

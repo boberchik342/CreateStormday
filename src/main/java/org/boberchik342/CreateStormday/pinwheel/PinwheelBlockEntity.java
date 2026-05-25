@@ -21,7 +21,7 @@ public class PinwheelBlockEntity extends BlockEntity {
     }
 
     public Vec3 getWind() {
-        return WindSystem.get(getLevel()).getWindVelocityAt(getLevel(), worldPosition.above());
+        return WindSystem.get(getLevel()).getWind(getLevel(), worldPosition.above().getCenter());
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, PinwheelBlockEntity blockEntity) {

@@ -42,7 +42,6 @@ public class PinwheelBlockEntityRenderer implements BlockEntityRenderer<Pinwheel
         poseStack.pushPose();
         poseStack.mulPose(Axis.ZP.rotation(pinwheelBlockEntity.getRotation(pt)));
         poseStack.translate(-0.5, -12f/16f, -0.5);
-
         dispatcher.getModelRenderer().tesselateBlock(
                 level, blades, state,
                 pinwheelBlockEntity.getBlockPos(),

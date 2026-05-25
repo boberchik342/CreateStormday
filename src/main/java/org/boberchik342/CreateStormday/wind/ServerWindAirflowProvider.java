@@ -7,15 +7,14 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.levelgen.synth.ImprovedNoise;
-import net.minecraft.world.phys.Vec2;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-public class ServerWindSystem extends WindSystem {
+public class ServerWindAirflowProvider extends WindAirflowProvider {
     private final ImprovedNoise noise;
     private boolean custom = false;
 
-    public ServerWindSystem(Level level) {
-        super(level);
+    public ServerWindAirflowProvider(Level level) {
+        super();
         MinecraftServer server = level.getServer();
         long seed = 342342342;
         if (server != null) {
@@ -28,11 +27,6 @@ public class ServerWindSystem extends WindSystem {
             LogUtils.getLogger().info("server is null");
         }
         noise = new ImprovedNoise(RandomSource.create(seed));
-    }
-
-    @Override
-    public Vec2 getWind() {
-        return new Vec2(strength, direction);
     }
 
     public void setWind(Level level, float strength, float direction) {

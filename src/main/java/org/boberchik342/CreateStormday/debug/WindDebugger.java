@@ -67,7 +67,7 @@ public class WindDebugger {
 
                     BlockPos pos = origin.offset(x * step, y * step, z * step);
 
-                    double e = wind.getDirectWindExposure(level, pos).value ? 1 : 0;
+                    double e = wind.windProvider.getDirectWindExposure(level, pos).value ? 1 : 0;
 
                     float r = (float) e;
                     float g = 0.2f;
@@ -141,7 +141,7 @@ public class WindDebugger {
 
     @SubscribeEvent
     public static void onRender(RenderGuiEvent.Post event) {
-        float strength = WindSystem.get(Minecraft.getInstance().level).getWind().x;
+        float strength = (float) WindSystem.get(Minecraft.getInstance().level).windProvider.getWindVelocity().length();
         event.getGuiGraphics().setColor(1, 1, 1, 1);
         event.getGuiGraphics().drawString(Minecraft.getInstance().font, String.valueOf(strength), 20, 20, 0xFFFFFFFF);
         event.getGuiGraphics().drawString(Minecraft.getInstance().font, String.valueOf(windTime), 20, 60, 0xFFFFFFFF);
