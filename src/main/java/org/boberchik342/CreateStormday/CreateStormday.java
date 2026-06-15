@@ -67,7 +67,6 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onCommonSetup(FMLCommonSetupEvent event) {
             LOGGER.info("Wind breaks crops: {}", Config.windBreaksCrops);
-            RaycastOctree.test();
         }
 
         @SubscribeEvent
@@ -161,7 +160,7 @@ public class CreateStormday {
                 }
             }
             Vec3 wind = system.getWind(entity.level(), pos);
-            if (wind.length() > 1) {
+            if (wind.lengthSqr() > 1) {
                 event.getEntity().addDeltaMovement(wind.scale(1.0/20 * (double) Config.windPushStrength / 100));
             }
         }

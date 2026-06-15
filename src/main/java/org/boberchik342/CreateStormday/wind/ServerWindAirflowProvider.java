@@ -21,7 +21,6 @@ public class ServerWindAirflowProvider extends WindAirflowProvider {
             ServerLevel overworld = server.getLevel(Level.OVERWORLD);
             if (overworld instanceof WorldGenLevel worldGenLevel) {
                 seed = worldGenLevel.getSeed();
-                LogUtils.getLogger().info("level is not WorldGenLevel");
             }
         } else {
             LogUtils.getLogger().info("server is null");
@@ -43,7 +42,8 @@ public class ServerWindAirflowProvider extends WindAirflowProvider {
     public void tick(Level level) {
         if (custom) return;
         double strengthNoise = (noise.noise((double) level.getGameTime() / 500, 0, 0) + 1) / 2;
-        strength = (float) (Math.pow(strengthNoise, 4) * (level.isThundering() ? 30 : 9));
+        double strengthNoiseSq = strengthNoise * strengthNoise;
+        strength = (float) (strengthNoiseSq * strengthNoiseSq * (level.isThundering() ? 30 : 9));
         double directionNoise = noise.noise((double) level.getGameTime() / 500, 100, 100);
         direction = (float) ((directionNoise + 1) * Math.PI);
         PacketDistributor.sendToPlayersInDimension((ServerLevel) level, new WindPacket(strength, direction));

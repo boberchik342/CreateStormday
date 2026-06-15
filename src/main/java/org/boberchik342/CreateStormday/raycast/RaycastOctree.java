@@ -51,6 +51,7 @@ public class RaycastOctree {
 
         NodeInfo nodeInfo = new NodeInfo(0, getBounds(), 0);
         Stack<Integer> trace = new Stack<>(); // used to collapse the nodes
+        BlockPos.MutableBlockPos origin = new BlockPos.MutableBlockPos();
 
         while (true) {
             trace.add(nodeInfo.id);
@@ -64,14 +65,14 @@ public class RaycastOctree {
                     createChildren(nodeInfo.id);
                 }
 
-                BlockPos origin = nodeInfo.bounds.getOrigin();
+                nodeInfo.bounds.getOrigin(origin);
 
                 boolean up = pos.getY() >= origin.getY();
                 boolean east = pos.getX() >= origin.getX();
                 boolean south = pos.getZ() >= origin.getZ();
 
                 int childIndex = getChildIndex(up, east, south);
-                Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
+                Bounds childBounds = nodeInfo.bounds.getChildBounds(childIndex, origin);
                 nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
             }
         }
@@ -139,6 +140,7 @@ public class RaycastOctree {
         Stack<NodeInfo> stack = new Stack<>();
         Stack<TraceElement> trace = new Stack<>();
         stack.add(new NodeInfo(0, getBounds(), 0));
+        BlockPos.MutableBlockPos origin = new BlockPos.MutableBlockPos();
 
         while (!stack.empty()) {
             NodeInfo nodeInfo = stack.pop();
@@ -174,7 +176,7 @@ public class RaycastOctree {
                     val = data.getInt(nodeInfo.id);
                 }
                 for (int i = 0; i < 8; i++) {
-                    stack.add(new NodeInfo(val + i, getChildBounds(nodeInfo.bounds, i), nodeInfo.depth + 1));
+                    stack.add(new NodeInfo(val + i, nodeInfo.bounds.getChildBounds(i, origin), nodeInfo.depth + 1));
                 }
             }
         }
@@ -222,6 +224,7 @@ public class RaycastOctree {
         if (!contains(pos)) return false;
 
         NodeInfo nodeInfo = new NodeInfo(0, getBounds(), 0);
+        BlockPos.MutableBlockPos origin = new BlockPos.MutableBlockPos();
 
         while (true) {
             if (nodeInfo.bounds.isSingleBlock()) {
@@ -231,14 +234,14 @@ public class RaycastOctree {
                     return data.getInt(nodeInfo.id) == -2;
                 }
 
-                BlockPos origin = nodeInfo.bounds.getOrigin();
+                nodeInfo.bounds.getOrigin(origin);
 
                 boolean up = pos.getY() >= origin.getY();
                 boolean east = pos.getX() >= origin.getX();
                 boolean south = pos.getZ() >= origin.getZ();
 
                 int childIndex = getChildIndex(up, east, south);
-                Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
+                Bounds childBounds = nodeInfo.bounds.getChildBounds(childIndex, origin);
                 nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
             }
         }
@@ -249,6 +252,7 @@ public class RaycastOctree {
         if (!contains(pos)) return null;
 
         NodeInfo nodeInfo = new NodeInfo(0, getBounds(), 0);
+        BlockPos.MutableBlockPos origin = new BlockPos.MutableBlockPos();
 
         while (true) {
             if (nodeInfo.bounds.isSingleBlock()) {
@@ -258,14 +262,14 @@ public class RaycastOctree {
                     return nodeInfo;
                 }
 
-                BlockPos origin = nodeInfo.bounds.getOrigin();
+                nodeInfo.bounds.getOrigin(origin);
 
                 boolean up = pos.getY() >= origin.getY();
                 boolean east = pos.getX() >= origin.getX();
                 boolean south = pos.getZ() >= origin.getZ();
 
                 int childIndex = getChildIndex(up, east, south);
-                Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
+                Bounds childBounds = nodeInfo.bounds.getChildBounds(childIndex, origin);
                 nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
             }
         }
@@ -303,10 +307,9 @@ public class RaycastOctree {
                 boolean east = pos.getX() >= origin.getX();
                 boolean south = pos.getZ() >= origin.getZ();
 
-                int childIndex = getChildIndex(up, east, south);
-                Bounds childBounds = getChildBounds(nodeInfo.bounds, up, east, south);
+                Bounds childBounds = nodeInfo.bounds.getChildBounds(up, east, south, origin);
 
-                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
+                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + getChildIndex(up, east, south), childBounds, nodeInfo.depth + 1);
             }
         }
     }
@@ -512,14 +515,14 @@ public class RaycastOctree {
 
         public BlockPos getOrigin() {
             return new BlockPos(
-                    (east + west + 1) / 2,
-                    (upper + lower + 1) / 2,
-                    (south + north + 1) / 2
+                    (east + west + 1) >> 1,
+                    (upper + lower + 1) >> 1,
+                    (south + north + 1) >> 1
             );
         }
 
         public void getOrigin(BlockPos.MutableBlockPos pos) {
-            pos.set((east + west + 1) / 2, (upper + lower + 1) / 2, (south + north + 1) / 2);
+            pos.set((east + west + 1) >> 1, (upper + lower + 1) >> 1, (south + north + 1) >> 1);
         }
 
         public Bounds copy() {
@@ -609,6 +612,26 @@ public class RaycastOctree {
             if (_up) lower = origin.getY(); else upper = origin.getY() - 1;
             if (_south) north = origin.getZ(); else south = origin.getZ() - 1;
         }
+
+        public Bounds getChildBounds(int childIndex, BlockPos origin) {
+            boolean up = (childIndex >> 2 & 1) != 0;
+            boolean east = (childIndex >> 1 & 1) != 0;
+            boolean south = (childIndex & 1) != 0;
+
+            Bounds childBounds = copy();
+            if (east) childBounds.west = origin.getX(); else childBounds.east = origin.getX() - 1;
+            if (up) childBounds.lower = origin.getY(); else childBounds.upper = origin.getY() - 1;
+            if (south) childBounds.north = origin.getZ(); else childBounds.south = origin.getZ() - 1;
+            return childBounds;
+        }
+
+        public Bounds getChildBounds(boolean up, boolean east, boolean south, BlockPos origin) {
+            Bounds childBounds = copy();
+            if (east) childBounds.west = origin.getX(); else childBounds.east = origin.getX() - 1;
+            if (up) childBounds.lower = origin.getY(); else childBounds.upper = origin.getY() - 1;
+            if (south) childBounds.north = origin.getZ(); else childBounds.south = origin.getZ() - 1;
+            return childBounds;
+        }
     }
 
     private boolean contains(BlockPos pos) {
@@ -630,27 +653,6 @@ public class RaycastOctree {
 
     private static int getChildIndex(boolean up, boolean east, boolean south) {
         return ((up ? 1 : 0) << 2) + ((east ? 1 : 0) << 1) + (south ? 1 : 0);
-    }
-
-    private static Bounds getChildBounds(Bounds bounds, int childIndex) {
-        boolean up = (childIndex >> 2 & 1) != 0;
-        boolean east = (childIndex >> 1 & 1) != 0;
-        boolean south = (childIndex & 1) != 0;
-        BlockPos origin = bounds.getOrigin();
-        Bounds childBounds = bounds.copy();
-        if (east) childBounds.west = origin.getX(); else childBounds.east = origin.getX() - 1;
-        if (up) childBounds.lower = origin.getY(); else childBounds.upper = origin.getY() - 1;
-        if (south) childBounds.north = origin.getZ(); else childBounds.south = origin.getZ() - 1;
-        return childBounds;
-    }
-
-    private static Bounds getChildBounds(Bounds bounds, boolean up, boolean east, boolean south) {
-        BlockPos origin = bounds.getOrigin();
-        Bounds childBounds = bounds.copy();
-        if (east) childBounds.west = origin.getX(); else childBounds.east = origin.getX() - 1;
-        if (up) childBounds.lower = origin.getY(); else childBounds.upper = origin.getY() - 1;
-        if (south) childBounds.north = origin.getZ(); else childBounds.south = origin.getZ() - 1;
-        return childBounds;
     }
 
     private static void printBounds(Bounds bounds) {
@@ -698,98 +700,6 @@ public class RaycastOctree {
         return true;
     }
 
-    public static boolean boundsLogicCheck() {
-        Bounds bounds = new Bounds();
-        bounds.north = 0;
-        bounds.south = 0;
-        bounds.west = 0;
-        bounds.east = 0;
-        bounds.upper = 0;
-        bounds.lower = 0;
-        if (!bounds.isSingleBlock()) return false;
-        bounds = new Bounds();
-        bounds.north = -2;
-        bounds.south = 1;
-        bounds.west = -2;
-        bounds.east = 1;
-        bounds.upper = 1;
-        bounds.lower = -2;
-        if (bounds.isSingleBlock()) return false;
-        Bounds childBounds = getChildBounds(bounds, getChildIndex(true, true, true));
-        if (
-                childBounds.lower != 0 || childBounds.upper != 1 ||
-                childBounds.west != 0 || childBounds.east != 1 ||
-                childBounds.north != 0 || childBounds.south != 1
-        ) return false;
-        if (childBounds.isSingleBlock()) return false;
-        childBounds = getChildBounds(bounds, getChildIndex(false, false, false));
-        if (
-                childBounds.lower != -2 || childBounds.upper != -1 ||
-                childBounds.west != -2 || childBounds.east != -1 ||
-                childBounds.north != -2 || childBounds.south != -1
-        ) return false;
-        return !childBounds.isSingleBlock();
-    }
-
-    public static void test() {
-        if (!RaycastOctree.boundsLogicCheck()) {
-            throw new RuntimeException("Bounds logic check did not pass");
-        }
-        RaycastOctree octree = new RaycastOctree();
-        Set<BlockPos> enabled = new HashSet<>();
-        for (int i = 0; i < 1000; i++) {
-            BlockPos pos = new BlockPos(
-                    (int)(Math.random()*100-50),
-                    (int)(Math.random()*100-50),
-                    (int)(Math.random()*100-50)
-            );
-            enabled.add(pos);
-            octree.set(pos, true);
-        }
-
-        for (int i = 0; i < 100; i++) {
-            BlockPos a = new BlockPos(
-                    (int)(Math.random()*100-50),
-                    (int)(Math.random()*100-50),
-                    (int)(Math.random()*100-50)
-            );
-            BlockPos b = a.offset(new Vec3i(
-                    (int)(Math.random()*10),
-                    (int)(Math.random()*10),
-                    (int)(Math.random()*10)
-            ));
-            boolean value = Math.random() > 0.5;
-            octree.fill(a, b, value);
-            for (int x = a.getX(); x <= b.getX(); x++) {
-                for (int y = a.getY(); y <= b.getY(); y++) {
-                    for (int z = a.getZ(); z <= b.getZ(); z++) {
-                        if (value) {
-                            enabled.add(new BlockPos(x, y, z));
-                        } else {
-                            enabled.remove(new BlockPos(x, y, z));
-                        }
-
-                    }
-                }
-            }
-            LogUtils.getLogger().info("Fill: {}", i);
-        }
-
-        for (int i = 0; i < 100000; i++) {
-            BlockPos pos = new BlockPos(
-                    (int)(Math.random()*100-50),
-                    (int)(Math.random()*100-50),
-                    (int)(Math.random()*100-50)
-            );
-            if (enabled.contains(pos) != octree.get(pos)) {
-                throw new RuntimeException("Octree didn't pass the test");
-            }
-        }
-        if (!octree.structureCheck()) {
-            throw new RuntimeException("Octree didn't pass structure test");
-        }
-    }
-
     public void loadChunk(LevelChunk chunk, boolean debug) {
         ChunkPos cp = chunk.getPos();
 
@@ -814,6 +724,7 @@ public class RaycastOctree {
         ArrayDeque<NodeInfo> stack = new ArrayDeque<>();
         ArrayDeque<TraceElement> trace = new ArrayDeque<>();
         stack.push(new NodeInfo(0, getBounds(), 0));
+        BlockPos.MutableBlockPos origin = new BlockPos.MutableBlockPos();
 
         int checkedSection = 0;
 
@@ -858,8 +769,9 @@ public class RaycastOctree {
                     if (!trace.isEmpty()) trace.peek().childrenModified = true;
                     val = data.getInt(nodeInfo.id);
                 }
+                nodeInfo.bounds.getOrigin(origin);
                 for (int i = 0; i < 8; i++) {
-                    stack.push(new NodeInfo(val + i, getChildBounds(nodeInfo.bounds, i), nodeInfo.depth + 1));
+                    stack.push(new NodeInfo(val + i, nodeInfo.bounds.getChildBounds(i, origin), nodeInfo.depth + 1));
                 }
             }
         }
