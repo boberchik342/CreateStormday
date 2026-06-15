@@ -9,7 +9,6 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
-import net.minecraft.util.Tuple;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -25,7 +24,7 @@ public class RaycastOctree {
     private int sizePower = 0;
     private BlockPos origin = new BlockPos(0, 0, 0);
     private final IntArrayList data = new IntArrayList();
-    private final ArrayDeque<Integer> freeIndices = new ArrayDeque<>();
+    private final IntArrayList freeIndices = new IntArrayList();
 
     private static class NodeInfo {
         public NodeInfo(int id, Bounds bounds, int depth) {
@@ -121,10 +120,16 @@ public class RaycastOctree {
      * @param b second corner of an area
      * @param value the value to fill the area with
      */
+
     public void fill(BlockPos a, BlockPos b, boolean value) {
+        fill(a, b, value ? -2 : -1);
+    }
+
+
+    private void fill(BlockPos a, BlockPos b, int value) {
         Bounds fillBounds = new Bounds();
 
-        if (value) {
+        if (value != -1) {
             expandToContain(a);
             expandToContain(b);
         }
@@ -151,9 +156,9 @@ public class RaycastOctree {
             }
 
             if (fillBounds.doesContain(nodeInfo.bounds)) {
+                if (data.getInt(nodeInfo.id) == value) continue;
                 deleteDescendants(nodeInfo.id);
-                data.set(nodeInfo.id, value ? -2 : -1);
-                // TODO: only set modified if actually modified
+                data.set(nodeInfo.id, value);
                 if (!trace.isEmpty()) trace.peek().childrenModified = true;
             } else if (fillBounds.intersects(nodeInfo.bounds)) {
                 if (nodeInfo.bounds.isSingleBlock()) {
@@ -164,13 +169,12 @@ public class RaycastOctree {
                     throw new RuntimeException("shouldn't happen");
                 }
                 int val = data.getInt(nodeInfo.id);
-                if (val == (value ? -2 : -1)) { // making sure at least one block is going to be modified or else created children will not get collapsed
+                if (val == (value)) { // making sure at least one block is going to be modified or else created children will not get collapsed
                     continue;
                 }
                 trace.push(new TraceElement(nodeInfo.id));
                 if (val < 0) {
                     createChildren(nodeInfo.id);
-                    trace.peek().childrenModified = true; // this shouldn't fix it and it didn't
                     val = data.getInt(nodeInfo.id);
                 }
                 for (int i = 0; i < 8; i++) {
@@ -193,7 +197,7 @@ public class RaycastOctree {
      * @param id an id of the node whose descendants to delete
      */
     private void deleteDescendants(int id) {
-        Stack<Integer> stack = new Stack<>();
+        IntArrayList stack = new IntArrayList();
         int val = data.getInt(id);
         if (val < 0) return;
         data.set(id, -3);
@@ -201,12 +205,12 @@ public class RaycastOctree {
             stack.add(val + i);
         }
         freeIndices.push(val);
-        while (!stack.empty()) {
-            int nodeId = stack.pop();
+        while (!stack.isEmpty()) {
+            int nodeId = stack.popInt();
             int value = data.getInt(nodeId);
             if (value >= 0) {
                 for (int i = 0; i < 8; i++) {
-                    stack.add(value + i);
+                    stack.push(value + i);
                 }
                 freeIndices.push(value);
             }
@@ -218,17 +222,17 @@ public class RaycastOctree {
      * @param pos the block position to retrieve data for
      * @return the value stored at that position, if the position isn't contained by the octree returns false
      */
-    public boolean get(BlockPos pos) {
-        if (!contains(pos)) return false;
+    public int get(BlockPos pos) {
+        if (!contains(pos)) return -1;
 
         NodeInfo nodeInfo = new NodeInfo(0, getBounds(), 0);
 
         while (true) {
             if (nodeInfo.bounds.isSingleBlock()) {
-                return data.getInt(nodeInfo.id) == -2;
+                return data.getInt(nodeInfo.id);
             } else {
                 if (data.getInt(nodeInfo.id) < 0) {
-                    return data.getInt(nodeInfo.id) == -2;
+                    return data.getInt(nodeInfo.id);
                 }
 
                 BlockPos origin = nodeInfo.bounds.getOrigin();
@@ -435,18 +439,17 @@ public class RaycastOctree {
      * @return true if the node collapsed and false if otherwise
      */
     private boolean tryCollapse(int id) {
-        boolean equal = true;
-        int firstChild = data.getInt(id);
-        int value = data.getInt(firstChild);
+        int[] elements = data.elements();
+        int firstChild = elements[id];
+        int value = elements[firstChild];
         for (int i = 1; i < 8; i++) {
-            if (data.getInt(firstChild + i) != value) {
-                equal = false;
-                break;
+            if (elements[firstChild + i] != value) {
+                return false;
             }
         }
-        if (!equal) return false;
+        elements[id] = value;
         removeChildren(firstChild);
-        data.set(id, value);
+
         return true;
     }
 
@@ -476,7 +479,7 @@ public class RaycastOctree {
             }
             return id;
         }
-        id = freeIndices.pop();
+        id = freeIndices.popInt();
         for (int i = 0; i < 8; i++) {
             data.set(id + i, value ? -2 : -1);
         }
@@ -488,7 +491,7 @@ public class RaycastOctree {
      * @param id the id of the first of the 8 children to delete
      */
     private void removeChildren(int id) {
-        freeIndices.push(id);
+        freeIndices.add(id);
     }
 
     private record HitInfo (Direction side, Vec3 position, BlockPos blockPos) {
@@ -781,7 +784,7 @@ public class RaycastOctree {
                     (int)(Math.random()*100-50),
                     (int)(Math.random()*100-50)
             );
-            if (enabled.contains(pos) != octree.get(pos)) {
+            if (enabled.contains(pos) != (octree.get(pos) == -2)) {
                 throw new RuntimeException("Octree didn't pass the test");
             }
         }
@@ -838,18 +841,32 @@ public class RaycastOctree {
                 if (checkedSection > 0) {
                     checkedSection++;
                 }
-                if (chunkBounds.doesContain(nodeInfo.bounds) && checkedSection == 0) {
-                    int lowerIndex = chunk.getSectionIndex(nodeInfo.bounds.lower);
-                    int upperIndex = chunk.getSectionIndex(nodeInfo.bounds.upper);
-                    if (lowerIndex == upperIndex) {
-                        checkedSection = 1;
-                        if (sections[lowerIndex].hasOnlyAir()) {
-                            deleteDescendants(nodeInfo.id);
-                            data.set(nodeInfo.id, -1);
-                            if (!trace.isEmpty()) trace.peek().childrenModified = true;
-                            continue;
+                if (chunkBounds.doesContain(nodeInfo.bounds)) {
+                    if (checkedSection == 0) {
+                        int lowerIndex = chunk.getSectionIndex(nodeInfo.bounds.lower);
+                        int upperIndex = chunk.getSectionIndex(nodeInfo.bounds.upper);
+                        if (lowerIndex == upperIndex) {
+                            checkedSection = 1;
+                            if (sections[lowerIndex].hasOnlyAir()) {
+                                deleteDescendants(nodeInfo.id);
+                                data.set(nodeInfo.id, -1);
+                                if (!trace.isEmpty()) trace.peek().childrenModified = true;
+                                continue;
+                            }
                         }
                     }
+//                    int c = 0;
+//                    int layersLeft = sizePower - nodeInfo.depth;
+//                    BlockPos pos = new BlockPos(nodeInfo.bounds.west, nodeInfo.bounds.lower, nodeInfo.bounds.north);
+//                    boolean val = !WindAirflowProvider.isBlockWindPassable(chunk.getBlockState(pos));
+//                    for (int c = 0; i < ; i++) {
+//
+//                    } {
+//                        if (val == WindAirflowProvider.isBlockWindPassable(chunk.getBlockState(pos))) {
+//
+//                        }
+//                        c++;
+//                    }
                 }
                 int val = data.getInt(nodeInfo.id);
                 trace.push(new TraceElement(nodeInfo.id));

@@ -22,7 +22,7 @@ public class RaycastDebugCommand {
                                 for (int y = ctx.getSource().getLevel().getMinBuildHeight(); y <= ctx.getSource().getLevel().getMaxBuildHeight(); y++) {
                                     ctx.getSource().getLevel().setBlock(
                                             new BlockPos(x, y, z),
-                                            RaycastHelper.get(ctx.getSource().getLevel()).get(new BlockPos(x, y, z)) ? Blocks.RED_WOOL.defaultBlockState() : Blocks.AIR.defaultBlockState()
+                                            RaycastHelper.get(ctx.getSource().getLevel()).get(new BlockPos(x, y, z)) == -2 ? Blocks.RED_WOOL.defaultBlockState() : Blocks.AIR.defaultBlockState()
                                             , 3
                                     );
                                 }

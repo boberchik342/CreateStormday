@@ -1,5 +1,6 @@
 package org.boberchik342.CreateStormday.wind;
 
+import dev.ryanhcode.sable.util.LevelAccelerator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -17,7 +18,10 @@ import org.joml.Vector3d;
 public class WindGraphics {
     public static void spawnParticles(Minecraft mc) {
         ClientLevel level = mc.level;
+
         if (mc.level == null || mc.player == null) return;
+
+        LevelAccelerator accelerator = new LevelAccelerator(level);
 
         Vector3d windVelocity = WindSystem.get(level).windProvider.getWindVelocity();
         Vec2 wind = new Vec2((float) windVelocity.x, (float) windVelocity.z);
@@ -29,7 +33,7 @@ public class WindGraphics {
         }
 
         if (Config.enableGroundParticles) {
-            spawnGroundParticles(wind, playerPos, level);
+            spawnGroundParticles(wind, playerPos, level, accelerator);
         }
     }
 
@@ -53,7 +57,7 @@ public class WindGraphics {
         }
     }
 
-    private static void spawnGroundParticles(Vec2 wind, Vec3 playerPos, Level level) {
+    private static void spawnGroundParticles(Vec2 wind, Vec3 playerPos, Level level, LevelAccelerator accelerator) {
         int volume = (int) Math.pow(Config.groundParticleSpawnAreaSize * 2 + 1, 3);
         for (int i = 0; i < volume * wind.length() / 64; i++) {
             BlockPos pos = new BlockPos(
@@ -61,12 +65,13 @@ public class WindGraphics {
                     (int) playerPos.y + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize,
                     (int) playerPos.z + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize
             );
-            BlockState state = level.getBlockState(pos);
+            BlockState state = accelerator.getBlockState(pos);
             if (!state.isAir()) continue;
             boolean windCalculated = false;
             for (var dir : Direction.values()) {
-                BlockPos sidePos = pos.offset(dir.getNormal());
-                BlockState s = level.getBlockState(sidePos);
+                Vec3i n = dir.getNormal();
+                BlockPos sidePos = pos.offset(n);
+                BlockState s = accelerator.getBlockState(sidePos);
                 if (s.isAir()) continue;
                 if (!windCalculated) {
                     if (WindSystem.get(level).getWind(level, pos.getCenter()).length() > 5) {
@@ -75,20 +80,14 @@ public class WindGraphics {
                         break;
                     }
                 }
-                Vec3 offset = new Vec3(
-                        level.random.nextDouble(),
-                        level.random.nextDouble(),
-                        level.random.nextDouble()
-                );
-                Vec3i n = dir.getNormal().multiply(-1);
-                Vec3 a = new Vec3(1 - Math.abs(dir.getNormal().getX()), 1 - Math.abs(dir.getNormal().getY()), 1 - Math.abs(dir.getNormal().getZ()));
-                Vec3 b = new Vec3(Math.max(n.getX(), 0), Math.max(n.getY(), 0), Math.max(n.getZ(), 0));
-                offset = offset.multiply(a).add(b);
+                double offsetX = level.random.nextDouble() * (1 - Math.abs(n.getX())) + Math.max(-n.getX(), 0);
+                double offsetY = level.random.nextDouble() * (1 - Math.abs(n.getY())) + Math.max(-n.getY(), 0);
+                double offsetZ = level.random.nextDouble() * (1 - Math.abs(n.getZ())) + Math.max(-n.getZ(), 0);
                 level.addParticle(
                         new BlockParticleOption(ParticleTypes.BLOCK, s),
-                        sidePos.getX() + offset.x,
-                        sidePos.getY() + offset.y,
-                        sidePos.getZ() + offset.z,
+                        sidePos.getX() + offsetX,
+                        sidePos.getY() + offsetY,
+                        sidePos.getZ() + offsetZ,
                         wind.x, 10, wind.y
                 );
             }
