@@ -5,6 +5,7 @@ import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.SubLevel;
+import dev.ryanhcode.sable.util.LevelAccelerator;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -25,6 +26,8 @@ public class RaycastOctree {
     private BlockPos origin = new BlockPos(0, 0, 0);
     private final IntArrayList data = new IntArrayList();
     private final IntArrayList freeIndices = new IntArrayList();
+    LevelAccelerator accelerator;
+    Level level;
 
     private static class NodeInfo {
         public NodeInfo(int id, Bounds bounds, int depth) {
@@ -38,8 +41,12 @@ public class RaycastOctree {
         Bounds bounds;
     }
 
-    public RaycastOctree() {
+    public RaycastOctree(Level level) {
         data.add(-1); // make the root node leaf with false as the value
+        if (level != null) {
+            this.level = level;
+            accelerator = new LevelAccelerator(level);
+        }
     }
 
     public void set(BlockPos pos, boolean value) {
@@ -226,13 +233,24 @@ public class RaycastOctree {
         if (!contains(pos)) return -1;
 
         NodeInfo nodeInfo = new NodeInfo(0, getBounds(), 0);
-
+        IntArrayList trace = new IntArrayList();
         while (true) {
+            trace.push(nodeInfo.id);
+            int val = data.getInt(nodeInfo.id);
+            if (val == -3) {
+                loadUnknownNode(nodeInfo);
+                val = data.getInt(nodeInfo.id);
+                if (val < 0) {
+                    trace.popInt();
+                    while (!trace.isEmpty() && tryCollapse(trace.popInt())) {};
+                    return val;
+                }
+            }
             if (nodeInfo.bounds.isSingleBlock()) {
-                return data.getInt(nodeInfo.id);
+                return val;
             } else {
-                if (data.getInt(nodeInfo.id) < 0) {
-                    return data.getInt(nodeInfo.id);
+                if (val < 0) {
+                    return val;
                 }
 
                 BlockPos origin = nodeInfo.bounds.getOrigin();
@@ -248,6 +266,7 @@ public class RaycastOctree {
         }
     }
 
+    @Deprecated
     @Nullable
     private NodeInfo getLeafNode(BlockPos pos) {
         if (!contains(pos)) return null;
@@ -294,10 +313,25 @@ public class RaycastOctree {
         while (true) {
             stack.push(nodeInfo);
 
+            int val = data.getInt(nodeInfo.id);
+
+            if (val == -3) {
+                loadUnknownNode(nodeInfo);
+                val = data.getInt(nodeInfo.id);
+                NodeInfo last = nodeInfo;
+                if (val < 0) {
+                    stack.pop();
+                    while (!stack.isEmpty() && tryCollapse(stack.peek().id)) {
+                        last = stack.pop();
+                    }
+                    return last;
+                }
+            }
+
             if (nodeInfo.bounds.isSingleBlock()) {
                 return nodeInfo;
             } else {
-                if (data.getInt(nodeInfo.id) < 0) {
+                if (val < 0) {
                     return nodeInfo;
                 }
 
@@ -310,7 +344,7 @@ public class RaycastOctree {
                 int childIndex = getChildIndex(up, east, south);
                 Bounds childBounds = getChildBounds(nodeInfo.bounds, up, east, south);
 
-                nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
+                nodeInfo = new NodeInfo(val + childIndex, childBounds, nodeInfo.depth + 1);
             }
         }
     }
@@ -738,7 +772,7 @@ public class RaycastOctree {
         if (!RaycastOctree.boundsLogicCheck()) {
             throw new RuntimeException("Bounds logic check did not pass");
         }
-        RaycastOctree octree = new RaycastOctree();
+        RaycastOctree octree = new RaycastOctree(null);
         Set<BlockPos> enabled = new HashSet<>();
         for (int i = 0; i < 1000; i++) {
             BlockPos pos = new BlockPos(
@@ -793,7 +827,59 @@ public class RaycastOctree {
         }
     }
 
-    public void loadChunk(LevelChunk chunk, boolean debug) {
+    public void loadedChunk(LevelChunk chunk) {
+        ChunkPos cp = chunk.getPos();
+
+        BlockPos a = new BlockPos(cp.getMinBlockX(), chunk.getMinBuildHeight(), cp.getMinBlockZ());
+        BlockPos b = new BlockPos(cp.getMaxBlockX(), chunk.getMaxBuildHeight(), cp.getMaxBlockZ());
+
+        fill(a, b, -3);
+    }
+
+    private void loadUnknownNode(final NodeInfo node) {
+        ArrayDeque<NodeInfo> stack = new ArrayDeque<>();
+        ArrayDeque<TraceElement> trace = new ArrayDeque<>();
+        stack.push(node);
+
+        while (!stack.isEmpty()) {
+            NodeInfo nodeInfo = stack.pop();
+            while (trace.size() > nodeInfo.depth) {
+                TraceElement element = trace.pop();
+                if (trace.isEmpty()) continue;
+                if (element.childrenModified && tryCollapse(element.id) && !trace.isEmpty()) {
+                    trace.peek().childrenModified = true;
+                }
+            }
+
+            if (nodeInfo.bounds.isSingleBlock()) {
+                BlockPos pos = new BlockPos(nodeInfo.bounds.east, nodeInfo.bounds.upper, nodeInfo.bounds.south);
+                data.set(nodeInfo.id, !WindAirflowProvider.isBlockWindPassable(accelerator.getBlockState(pos)) ? -2 : -1);
+                if (!trace.isEmpty()) trace.peek().childrenModified = true;
+                continue;
+            }
+
+            int val = data.getInt(nodeInfo.id);
+            trace.push(new TraceElement(nodeInfo.id));
+            if (val < 0) {
+                createChildren(nodeInfo.id);
+                if (!trace.isEmpty()) trace.peek().childrenModified = true;
+                val = data.getInt(nodeInfo.id);
+            }
+            for (int i = 0; i < 8; i++) {
+                stack.push(new NodeInfo(val + i, getChildBounds(nodeInfo.bounds, i), nodeInfo.depth + 1));
+            }
+
+        }
+        while (!trace.isEmpty()) {
+            TraceElement element = trace.pop();
+            if (trace.isEmpty()) continue;
+            if (element.childrenModified && tryCollapse(element.id) && !trace.isEmpty()) {
+                trace.peek().childrenModified = true;
+            }
+        }
+    }
+
+    public void loadChunkFull(LevelChunk chunk) {
         ChunkPos cp = chunk.getPos();
 
         BlockPos a = new BlockPos(cp.getMinBlockX(), chunk.getMinBuildHeight(), cp.getMinBlockZ());
@@ -811,8 +897,6 @@ public class RaycastOctree {
         chunkBounds.west = Math.min(a.getX(), b.getX());
         chunkBounds.north = Math.min(a.getZ(), b.getZ());
         chunkBounds.lower = Math.min(a.getY(), b.getY());
-
-        if (debug) printBounds(chunkBounds);
 
         ArrayDeque<NodeInfo> stack = new ArrayDeque<>();
         ArrayDeque<TraceElement> trace = new ArrayDeque<>();
@@ -855,18 +939,6 @@ public class RaycastOctree {
                             }
                         }
                     }
-//                    int c = 0;
-//                    int layersLeft = sizePower - nodeInfo.depth;
-//                    BlockPos pos = new BlockPos(nodeInfo.bounds.west, nodeInfo.bounds.lower, nodeInfo.bounds.north);
-//                    boolean val = !WindAirflowProvider.isBlockWindPassable(chunk.getBlockState(pos));
-//                    for (int c = 0; i < ; i++) {
-//
-//                    } {
-//                        if (val == WindAirflowProvider.isBlockWindPassable(chunk.getBlockState(pos))) {
-//
-//                        }
-//                        c++;
-//                    }
                 }
                 int val = data.getInt(nodeInfo.id);
                 trace.push(new TraceElement(nodeInfo.id));
