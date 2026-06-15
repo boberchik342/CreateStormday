@@ -5,11 +5,11 @@ import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.SubLevel;
+import dev.ryanhcode.sable.util.LevelAccelerator;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
-import net.minecraft.util.Tuple;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -25,7 +25,9 @@ public class RaycastOctree {
     private int sizePower = 0;
     private BlockPos origin = new BlockPos(0, 0, 0);
     private final IntArrayList data = new IntArrayList();
-    private final ArrayDeque<Integer> freeIndices = new ArrayDeque<>();
+    private final IntArrayList freeIndices = new IntArrayList();
+    LevelAccelerator accelerator;
+    Level level;
 
     private static class NodeInfo {
         public NodeInfo(int id, Bounds bounds, int depth) {
@@ -39,8 +41,12 @@ public class RaycastOctree {
         Bounds bounds;
     }
 
-    public RaycastOctree() {
+    public RaycastOctree(Level level) {
         data.add(-1); // make the root node leaf with false as the value
+        if (level != null) {
+            this.level = level;
+            accelerator = new LevelAccelerator(level);
+        }
     }
 
     public void set(BlockPos pos, boolean value) {
@@ -122,10 +128,16 @@ public class RaycastOctree {
      * @param b second corner of an area
      * @param value the value to fill the area with
      */
+
     public void fill(BlockPos a, BlockPos b, boolean value) {
+        fill(a, b, value ? -2 : -1);
+    }
+
+
+    private void fill(BlockPos a, BlockPos b, int value) {
         Bounds fillBounds = new Bounds();
 
-        if (value) {
+        if (value != -1) {
             expandToContain(a);
             expandToContain(b);
         }
@@ -153,9 +165,9 @@ public class RaycastOctree {
             }
 
             if (fillBounds.doesContain(nodeInfo.bounds)) {
+                if (data.getInt(nodeInfo.id) == value) continue;
                 deleteDescendants(nodeInfo.id);
-                data.set(nodeInfo.id, value ? -2 : -1);
-                // TODO: only set modified if actually modified
+                data.set(nodeInfo.id, value);
                 if (!trace.isEmpty()) trace.peek().childrenModified = true;
             } else if (fillBounds.intersects(nodeInfo.bounds)) {
                 if (nodeInfo.bounds.isSingleBlock()) {
@@ -166,13 +178,12 @@ public class RaycastOctree {
                     throw new RuntimeException("shouldn't happen");
                 }
                 int val = data.getInt(nodeInfo.id);
-                if (val == (value ? -2 : -1)) { // making sure at least one block is going to be modified or else created children will not get collapsed
+                if (val == (value)) { // making sure at least one block is going to be modified or else created children will not get collapsed
                     continue;
                 }
                 trace.push(new TraceElement(nodeInfo.id));
                 if (val < 0) {
                     createChildren(nodeInfo.id);
-                    trace.peek().childrenModified = true; // this shouldn't fix it and it didn't
                     val = data.getInt(nodeInfo.id);
                 }
                 for (int i = 0; i < 8; i++) {
@@ -195,7 +206,7 @@ public class RaycastOctree {
      * @param id an id of the node whose descendants to delete
      */
     private void deleteDescendants(int id) {
-        Stack<Integer> stack = new Stack<>();
+        IntArrayList stack = new IntArrayList();
         int val = data.getInt(id);
         if (val < 0) return;
         data.set(id, -3);
@@ -203,12 +214,12 @@ public class RaycastOctree {
             stack.add(val + i);
         }
         freeIndices.push(val);
-        while (!stack.empty()) {
-            int nodeId = stack.pop();
+        while (!stack.isEmpty()) {
+            int nodeId = stack.popInt();
             int value = data.getInt(nodeId);
             if (value >= 0) {
                 for (int i = 0; i < 8; i++) {
-                    stack.add(value + i);
+                    stack.push(value + i);
                 }
                 freeIndices.push(value);
             }
@@ -220,18 +231,29 @@ public class RaycastOctree {
      * @param pos the block position to retrieve data for
      * @return the value stored at that position, if the position isn't contained by the octree returns false
      */
-    public boolean get(BlockPos pos) {
-        if (!contains(pos)) return false;
+    public int get(BlockPos pos) {
+        if (!contains(pos)) return -1;
 
         NodeInfo nodeInfo = new NodeInfo(0, getBounds(), 0);
         BlockPos.MutableBlockPos origin = new BlockPos.MutableBlockPos();
 
         while (true) {
+            trace.push(nodeInfo.id);
+            int val = data.getInt(nodeInfo.id);
+            if (val == -3) {
+                loadUnknownNode(nodeInfo);
+                val = data.getInt(nodeInfo.id);
+                if (val < 0) {
+                    trace.popInt();
+                    while (!trace.isEmpty() && tryCollapse(trace.popInt())) {};
+                    return val;
+                }
+            }
             if (nodeInfo.bounds.isSingleBlock()) {
-                return data.getInt(nodeInfo.id) == -2;
+                return val;
             } else {
-                if (data.getInt(nodeInfo.id) < 0) {
-                    return data.getInt(nodeInfo.id) == -2;
+                if (val < 0) {
+                    return val;
                 }
 
                 nodeInfo.bounds.getOrigin(origin);
@@ -247,6 +269,7 @@ public class RaycastOctree {
         }
     }
 
+    @Deprecated
     @Nullable
     private NodeInfo getLeafNode(BlockPos pos) {
         if (!contains(pos)) return null;
@@ -294,10 +317,25 @@ public class RaycastOctree {
         while (true) {
             stack.push(nodeInfo);
 
+            int val = data.getInt(nodeInfo.id);
+
+            if (val == -3) {
+                loadUnknownNode(nodeInfo);
+                val = data.getInt(nodeInfo.id);
+                NodeInfo last = nodeInfo;
+                if (val < 0) {
+                    stack.pop();
+                    while (!stack.isEmpty() && tryCollapse(stack.peek().id)) {
+                        last = stack.pop();
+                    }
+                    return last;
+                }
+            }
+
             if (nodeInfo.bounds.isSingleBlock()) {
                 return nodeInfo;
             } else {
-                if (data.getInt(nodeInfo.id) < 0) {
+                if (val < 0) {
                     return nodeInfo;
                 }
 
@@ -438,18 +476,17 @@ public class RaycastOctree {
      * @return true if the node collapsed and false if otherwise
      */
     private boolean tryCollapse(int id) {
-        boolean equal = true;
-        int firstChild = data.getInt(id);
-        int value = data.getInt(firstChild);
+        int[] elements = data.elements();
+        int firstChild = elements[id];
+        int value = elements[firstChild];
         for (int i = 1; i < 8; i++) {
-            if (data.getInt(firstChild + i) != value) {
-                equal = false;
-                break;
+            if (elements[firstChild + i] != value) {
+                return false;
             }
         }
-        if (!equal) return false;
+        elements[id] = value;
         removeChildren(firstChild);
-        data.set(id, value);
+
         return true;
     }
 
@@ -479,7 +516,7 @@ public class RaycastOctree {
             }
             return id;
         }
-        id = freeIndices.pop();
+        id = freeIndices.popInt();
         for (int i = 0; i < 8; i++) {
             data.set(id + i, value ? -2 : -1);
         }
@@ -491,7 +528,7 @@ public class RaycastOctree {
      * @param id the id of the first of the 8 children to delete
      */
     private void removeChildren(int id) {
-        freeIndices.push(id);
+        freeIndices.add(id);
     }
 
     private record HitInfo (Direction side, Vec3 position, BlockPos blockPos) {
@@ -700,7 +737,151 @@ public class RaycastOctree {
         return true;
     }
 
-    public void loadChunk(LevelChunk chunk, boolean debug) {
+    public static boolean boundsLogicCheck() {
+        Bounds bounds = new Bounds();
+        bounds.north = 0;
+        bounds.south = 0;
+        bounds.west = 0;
+        bounds.east = 0;
+        bounds.upper = 0;
+        bounds.lower = 0;
+        if (!bounds.isSingleBlock()) return false;
+        bounds = new Bounds();
+        bounds.north = -2;
+        bounds.south = 1;
+        bounds.west = -2;
+        bounds.east = 1;
+        bounds.upper = 1;
+        bounds.lower = -2;
+        if (bounds.isSingleBlock()) return false;
+        Bounds childBounds = getChildBounds(bounds, getChildIndex(true, true, true));
+        if (
+                childBounds.lower != 0 || childBounds.upper != 1 ||
+                childBounds.west != 0 || childBounds.east != 1 ||
+                childBounds.north != 0 || childBounds.south != 1
+        ) return false;
+        if (childBounds.isSingleBlock()) return false;
+        childBounds = getChildBounds(bounds, getChildIndex(false, false, false));
+        if (
+                childBounds.lower != -2 || childBounds.upper != -1 ||
+                childBounds.west != -2 || childBounds.east != -1 ||
+                childBounds.north != -2 || childBounds.south != -1
+        ) return false;
+        return !childBounds.isSingleBlock();
+    }
+
+    public static void test() {
+        if (!RaycastOctree.boundsLogicCheck()) {
+            throw new RuntimeException("Bounds logic check did not pass");
+        }
+        RaycastOctree octree = new RaycastOctree(null);
+        Set<BlockPos> enabled = new HashSet<>();
+        for (int i = 0; i < 1000; i++) {
+            BlockPos pos = new BlockPos(
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50)
+            );
+            enabled.add(pos);
+            octree.set(pos, true);
+        }
+
+        for (int i = 0; i < 100; i++) {
+            BlockPos a = new BlockPos(
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50)
+            );
+            BlockPos b = a.offset(new Vec3i(
+                    (int)(Math.random()*10),
+                    (int)(Math.random()*10),
+                    (int)(Math.random()*10)
+            ));
+            boolean value = Math.random() > 0.5;
+            octree.fill(a, b, value);
+            for (int x = a.getX(); x <= b.getX(); x++) {
+                for (int y = a.getY(); y <= b.getY(); y++) {
+                    for (int z = a.getZ(); z <= b.getZ(); z++) {
+                        if (value) {
+                            enabled.add(new BlockPos(x, y, z));
+                        } else {
+                            enabled.remove(new BlockPos(x, y, z));
+                        }
+
+                    }
+                }
+            }
+            LogUtils.getLogger().info("Fill: {}", i);
+        }
+
+        for (int i = 0; i < 100000; i++) {
+            BlockPos pos = new BlockPos(
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50),
+                    (int)(Math.random()*100-50)
+            );
+            if (enabled.contains(pos) != (octree.get(pos) == -2)) {
+                throw new RuntimeException("Octree didn't pass the test");
+            }
+        }
+        if (!octree.structureCheck()) {
+            throw new RuntimeException("Octree didn't pass structure test");
+        }
+    }
+
+    public void loadedChunk(LevelChunk chunk) {
+        ChunkPos cp = chunk.getPos();
+
+        BlockPos a = new BlockPos(cp.getMinBlockX(), chunk.getMinBuildHeight(), cp.getMinBlockZ());
+        BlockPos b = new BlockPos(cp.getMaxBlockX(), chunk.getMaxBuildHeight(), cp.getMaxBlockZ());
+
+        fill(a, b, -3);
+    }
+
+    private void loadUnknownNode(final NodeInfo node) {
+        ArrayDeque<NodeInfo> stack = new ArrayDeque<>();
+        ArrayDeque<TraceElement> trace = new ArrayDeque<>();
+        stack.push(node);
+
+        while (!stack.isEmpty()) {
+            NodeInfo nodeInfo = stack.pop();
+            while (trace.size() > nodeInfo.depth) {
+                TraceElement element = trace.pop();
+                if (trace.isEmpty()) continue;
+                if (element.childrenModified && tryCollapse(element.id) && !trace.isEmpty()) {
+                    trace.peek().childrenModified = true;
+                }
+            }
+
+            if (nodeInfo.bounds.isSingleBlock()) {
+                BlockPos pos = new BlockPos(nodeInfo.bounds.east, nodeInfo.bounds.upper, nodeInfo.bounds.south);
+                data.set(nodeInfo.id, !WindAirflowProvider.isBlockWindPassable(accelerator.getBlockState(pos)) ? -2 : -1);
+                if (!trace.isEmpty()) trace.peek().childrenModified = true;
+                continue;
+            }
+
+            int val = data.getInt(nodeInfo.id);
+            trace.push(new TraceElement(nodeInfo.id));
+            if (val < 0) {
+                createChildren(nodeInfo.id);
+                if (!trace.isEmpty()) trace.peek().childrenModified = true;
+                val = data.getInt(nodeInfo.id);
+            }
+            for (int i = 0; i < 8; i++) {
+                stack.push(new NodeInfo(val + i, getChildBounds(nodeInfo.bounds, i), nodeInfo.depth + 1));
+            }
+
+        }
+        while (!trace.isEmpty()) {
+            TraceElement element = trace.pop();
+            if (trace.isEmpty()) continue;
+            if (element.childrenModified && tryCollapse(element.id) && !trace.isEmpty()) {
+                trace.peek().childrenModified = true;
+            }
+        }
+    }
+
+    public void loadChunkFull(LevelChunk chunk) {
         ChunkPos cp = chunk.getPos();
 
         BlockPos a = new BlockPos(cp.getMinBlockX(), chunk.getMinBuildHeight(), cp.getMinBlockZ());
@@ -718,8 +899,6 @@ public class RaycastOctree {
         chunkBounds.west = Math.min(a.getX(), b.getX());
         chunkBounds.north = Math.min(a.getZ(), b.getZ());
         chunkBounds.lower = Math.min(a.getY(), b.getY());
-
-        if (debug) printBounds(chunkBounds);
 
         ArrayDeque<NodeInfo> stack = new ArrayDeque<>();
         ArrayDeque<TraceElement> trace = new ArrayDeque<>();
@@ -749,16 +928,18 @@ public class RaycastOctree {
                 if (checkedSection > 0) {
                     checkedSection++;
                 }
-                if (chunkBounds.doesContain(nodeInfo.bounds) && checkedSection == 0) {
-                    int lowerIndex = chunk.getSectionIndex(nodeInfo.bounds.lower);
-                    int upperIndex = chunk.getSectionIndex(nodeInfo.bounds.upper);
-                    if (lowerIndex == upperIndex) {
-                        checkedSection = 1;
-                        if (sections[lowerIndex].hasOnlyAir()) {
-                            deleteDescendants(nodeInfo.id);
-                            data.set(nodeInfo.id, -1);
-                            if (!trace.isEmpty()) trace.peek().childrenModified = true;
-                            continue;
+                if (chunkBounds.doesContain(nodeInfo.bounds)) {
+                    if (checkedSection == 0) {
+                        int lowerIndex = chunk.getSectionIndex(nodeInfo.bounds.lower);
+                        int upperIndex = chunk.getSectionIndex(nodeInfo.bounds.upper);
+                        if (lowerIndex == upperIndex) {
+                            checkedSection = 1;
+                            if (sections[lowerIndex].hasOnlyAir()) {
+                                deleteDescendants(nodeInfo.id);
+                                data.set(nodeInfo.id, -1);
+                                if (!trace.isEmpty()) trace.peek().childrenModified = true;
+                                continue;
+                            }
                         }
                     }
                 }
