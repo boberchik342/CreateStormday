@@ -8,10 +8,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.Config;
-import org.joml.Vector3d;
 
 import java.util.*;
 
@@ -19,7 +17,6 @@ public class WindSystem {
     public static long windComputeTime;
     public WindAirflowProvider windProvider;
     private final List<AirflowProvider> airflowProviders = new ArrayList<>();
-
 
     public static class CacheEntry<T> {
         public CacheEntry(long created, T value) {
@@ -31,6 +28,10 @@ public class WindSystem {
     }
     private static final WeakHashMap<Level, WindSystem> windSystems = new WeakHashMap<>();
 
+    public void addAirflowProvider(AirflowProvider provider) {
+        airflowProviders.add(provider);
+    }
+
     public static WindSystem get(Level level) {
         WindSystem system = windSystems.get(level);
         if (system != null) return system;
@@ -38,7 +39,6 @@ public class WindSystem {
     }
 
     public final WeakHashMap<LevelChunk, Set<BlockPos>> crops = new WeakHashMap<>();
-    public final WeakHashMap<LevelChunk, Map<BlockPos, CacheEntry<Double>>> cache = new WeakHashMap<>();
 
     public WindSystem(Level level) {
         windSystems.put(level, this);

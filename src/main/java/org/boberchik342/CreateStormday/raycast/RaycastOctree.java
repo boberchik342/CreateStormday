@@ -13,11 +13,10 @@ import net.minecraft.util.Tuple;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.wind.WindAirflowProvider;
-import org.boberchik342.CreateStormday.wind.WindSystem;
 import org.jetbrains.annotations.Nullable;
-import org.w3c.dom.Node;
 
 import java.util.*;
 
@@ -26,7 +25,7 @@ public class RaycastOctree {
     private int sizePower = 0;
     private BlockPos origin = new BlockPos(0, 0, 0);
     private final IntArrayList data = new IntArrayList();
-    private final Stack<Integer> freeIndices = new Stack<>();
+    private final ArrayDeque<Integer> freeIndices = new ArrayDeque<>();
 
     private static class NodeInfo {
         public NodeInfo(int id, Bounds bounds, int depth) {
@@ -190,7 +189,6 @@ public class RaycastOctree {
 
     /**
      * removes all descendants of a specified node<br>
-     * the node must not be a leaf node<br>
      * <b>this does not make it stop pointing to a non-existent node</b>
      * @param id an id of the node whose descendants to delete
      */
@@ -202,7 +200,7 @@ public class RaycastOctree {
         for (int i = 0; i < 8; i++) {
             stack.add(val + i);
         }
-        freeIndices.add(val);
+        freeIndices.push(val);
         while (!stack.empty()) {
             int nodeId = stack.pop();
             int value = data.getInt(nodeId);
@@ -210,7 +208,7 @@ public class RaycastOctree {
                 for (int i = 0; i < 8; i++) {
                     stack.add(value + i);
                 }
-                freeIndices.add(value);
+                freeIndices.push(value);
             }
         }
     }
@@ -273,37 +271,41 @@ public class RaycastOctree {
         }
     }
 
-    private Tuple<@Nullable NodeInfo, Stack<NodeInfo>> getLeafNode(BlockPos pos, Stack<NodeInfo> stack) {
+    @Nullable
+    private NodeInfo getLeafNode(BlockPos pos, ArrayDeque<NodeInfo> stack) {
         if (!contains(pos)) return null;
 
-        while (!stack.empty() && !stack.peek().bounds.contains(pos)) {
+        while (!stack.isEmpty() && !stack.peek().bounds.contains(pos)) {
             stack.pop();
         }
 
-        if (stack.empty()) {
+        if (stack.isEmpty()) {
             throw new IllegalArgumentException("The first element of the stack must be the root node");
         }
 
         NodeInfo nodeInfo = stack.pop();
 
+        BlockPos.MutableBlockPos origin = new BlockPos.MutableBlockPos();
+
         while (true) {
-            stack.add(nodeInfo);
+            stack.push(nodeInfo);
 
             if (nodeInfo.bounds.isSingleBlock()) {
-                return new Tuple<>(nodeInfo, stack);
+                return nodeInfo;
             } else {
                 if (data.getInt(nodeInfo.id) < 0) {
-                    return new Tuple<>(nodeInfo, stack);
+                    return nodeInfo;
                 }
 
-                BlockPos origin = nodeInfo.bounds.getOrigin();
+                nodeInfo.bounds.getOrigin(origin);
 
                 boolean up = pos.getY() >= origin.getY();
                 boolean east = pos.getX() >= origin.getX();
                 boolean south = pos.getZ() >= origin.getZ();
 
                 int childIndex = getChildIndex(up, east, south);
-                Bounds childBounds = getChildBounds(nodeInfo.bounds, childIndex);
+                Bounds childBounds = getChildBounds(nodeInfo.bounds, up, east, south);
+
                 nodeInfo = new NodeInfo(data.getInt(nodeInfo.id) + childIndex, childBounds, nodeInfo.depth + 1);
             }
         }
@@ -354,13 +356,11 @@ public class RaycastOctree {
             pos = info.position;
         }
 
-        Stack<NodeInfo> stack = new Stack<>();
-        stack.add(new NodeInfo(0, getBounds(), 0));
+        ArrayDeque<NodeInfo> stack = new ArrayDeque<>();
+        stack.push(new NodeInfo(0, getBounds(), 0));
 
         while (bounds.contains(blockPos)) {
-            Tuple<NodeInfo, Stack<NodeInfo>> tuple = getLeafNode(blockPos, stack);
-            assert tuple != null;
-            NodeInfo info = tuple.getA();
+            NodeInfo info = getLeafNode(blockPos, stack);
             if (info == null) break;
             Bounds nodeBounds = info.bounds;
             if (data.getInt(info.id) == -2) return true;
@@ -469,7 +469,7 @@ public class RaycastOctree {
      */
     private int createChildren(boolean value) {
         int id;
-        if (freeIndices.empty()) {
+        if (freeIndices.isEmpty()) {
             id = data.size();
             for (int i = 0; i < 8; i++) {
                 data.add(value ? -2 : -1);
@@ -516,6 +516,10 @@ public class RaycastOctree {
                     (upper + lower + 1) / 2,
                     (south + north + 1) / 2
             );
+        }
+
+        public void getOrigin(BlockPos.MutableBlockPos pos) {
+            pos.set((east + west + 1) / 2, (upper + lower + 1) / 2, (south + north + 1) / 2);
         }
 
         public Bounds copy() {
@@ -598,6 +602,13 @@ public class RaycastOctree {
 
             return new HitInfo(intersectionSide, pos, blockPos);
         }
+
+        public void becomeChildBounds(boolean _up, boolean _east, boolean _south) {
+            BlockPos origin = getOrigin();
+            if (_east) west = origin.getX(); else east = origin.getX() - 1;
+            if (_up) lower = origin.getY(); else upper = origin.getY() - 1;
+            if (_south) north = origin.getZ(); else south = origin.getZ() - 1;
+        }
     }
 
     private boolean contains(BlockPos pos) {
@@ -625,6 +636,15 @@ public class RaycastOctree {
         boolean up = (childIndex >> 2 & 1) != 0;
         boolean east = (childIndex >> 1 & 1) != 0;
         boolean south = (childIndex & 1) != 0;
+        BlockPos origin = bounds.getOrigin();
+        Bounds childBounds = bounds.copy();
+        if (east) childBounds.west = origin.getX(); else childBounds.east = origin.getX() - 1;
+        if (up) childBounds.lower = origin.getY(); else childBounds.upper = origin.getY() - 1;
+        if (south) childBounds.north = origin.getZ(); else childBounds.south = origin.getZ() - 1;
+        return childBounds;
+    }
+
+    private static Bounds getChildBounds(Bounds bounds, boolean up, boolean east, boolean south) {
         BlockPos origin = bounds.getOrigin();
         Bounds childBounds = bounds.copy();
         if (east) childBounds.west = origin.getX(); else childBounds.east = origin.getX() - 1;
@@ -779,6 +799,8 @@ public class RaycastOctree {
         expandToContain(a);
         expandToContain(b);
 
+        LevelChunkSection[] sections = chunk.getSections();
+
         Bounds chunkBounds = new Bounds();
         chunkBounds.east = Math.max(a.getX(), b.getX());
         chunkBounds.south = Math.max(a.getZ(), b.getZ());
@@ -789,16 +811,19 @@ public class RaycastOctree {
 
         if (debug) printBounds(chunkBounds);
 
-        Stack<NodeInfo> stack = new Stack<>();
-        Stack<TraceElement> trace = new Stack<>();
-        stack.add(new NodeInfo(0, getBounds(), 0));
+        ArrayDeque<NodeInfo> stack = new ArrayDeque<>();
+        ArrayDeque<TraceElement> trace = new ArrayDeque<>();
+        stack.push(new NodeInfo(0, getBounds(), 0));
 
-        while (!stack.empty()) {
+        int checkedSection = 0;
+
+        while (!stack.isEmpty()) {
             NodeInfo nodeInfo = stack.pop();
             while (trace.size() > nodeInfo.depth) {
                 TraceElement element = trace.pop();
-                if (trace.empty()) continue;
-                if (element.childrenModified && tryCollapse(element.id) && !trace.empty()) {
+                if (checkedSection > 0) checkedSection--;
+                if (trace.isEmpty()) continue;
+                if (element.childrenModified && tryCollapse(element.id) && !trace.isEmpty()) {
                     trace.peek().childrenModified = true;
                 }
             }
@@ -807,25 +832,41 @@ public class RaycastOctree {
                 if (nodeInfo.bounds.isSingleBlock()) {
                     BlockPos pos = new BlockPos(nodeInfo.bounds.east, nodeInfo.bounds.upper, nodeInfo.bounds.south);
                     data.set(nodeInfo.id, !WindAirflowProvider.isBlockWindPassable(chunk.getBlockState(pos)) ? -2 : -1);
-                    if (!trace.empty()) trace.peek().childrenModified = true;
+                    if (!trace.isEmpty()) trace.peek().childrenModified = true;
                     continue;
+                }
+                if (checkedSection > 0) {
+                    checkedSection++;
+                }
+                if (chunkBounds.doesContain(nodeInfo.bounds) && checkedSection == 0) {
+                    int lowerIndex = chunk.getSectionIndex(nodeInfo.bounds.lower);
+                    int upperIndex = chunk.getSectionIndex(nodeInfo.bounds.upper);
+                    if (lowerIndex == upperIndex) {
+                        checkedSection = 1;
+                        if (sections[lowerIndex].hasOnlyAir()) {
+                            deleteDescendants(nodeInfo.id);
+                            data.set(nodeInfo.id, -1);
+                            if (!trace.isEmpty()) trace.peek().childrenModified = true;
+                            continue;
+                        }
+                    }
                 }
                 int val = data.getInt(nodeInfo.id);
                 trace.push(new TraceElement(nodeInfo.id));
                 if (val < 0) {
                     createChildren(nodeInfo.id);
-                    trace.peek().childrenModified = true;
+                    if (!trace.isEmpty()) trace.peek().childrenModified = true;
                     val = data.getInt(nodeInfo.id);
                 }
                 for (int i = 0; i < 8; i++) {
-                    stack.add(new NodeInfo(val + i, getChildBounds(nodeInfo.bounds, i), nodeInfo.depth + 1));
+                    stack.push(new NodeInfo(val + i, getChildBounds(nodeInfo.bounds, i), nodeInfo.depth + 1));
                 }
             }
         }
         while (!trace.isEmpty()) {
             TraceElement element = trace.pop();
-            if (trace.empty()) continue;
-            if (element.childrenModified && tryCollapse(element.id) && !trace.empty()) {
+            if (trace.isEmpty()) continue;
+            if (element.childrenModified && tryCollapse(element.id) && !trace.isEmpty()) {
                 trace.peek().childrenModified = true;
             }
         }

@@ -61,31 +61,38 @@ public class WindGraphics {
                     (int) playerPos.y + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize,
                     (int) playerPos.z + level.random.nextInt(1 + 2 * Config.groundParticleSpawnAreaSize) - Config.groundParticleSpawnAreaSize
             );
-            if (WindSystem.get(level).getWind(level, pos.getCenter()).length() > 5) {
-                BlockState state = level.getBlockState(pos);
-                if (!state.isAir()) continue;
-                for (var dir : Direction.values()) {
-                    BlockPos sidePos = pos.offset(dir.getNormal());
-                    BlockState s = level.getBlockState(sidePos);
-                    if (s.isAir()) continue;
-                    Vec3 offset = new Vec3(
-                            level.random.nextDouble(),
-                            level.random.nextDouble(),
-                            level.random.nextDouble()
-                    );
-                    Vec3i n = dir.getNormal().multiply(-1);
-                    Vec3 a = new Vec3(1 - Math.abs(dir.getNormal().getX()), 1 - Math.abs(dir.getNormal().getY()), 1 - Math.abs(dir.getNormal().getZ()));
-                    Vec3 b = new Vec3(Math.max(n.getX(), 0), Math.max(n.getY(), 0), Math.max(n.getZ(), 0));
-                    offset = offset.multiply(a).add(b);
-                    level.addParticle(
-                            new BlockParticleOption(ParticleTypes.BLOCK, s),
-                            sidePos.getX() + offset.x,
-                            sidePos.getY() + offset.y,
-                            sidePos.getZ() + offset.z,
-                            wind.x, 10, wind.y
-                    );
+            BlockState state = level.getBlockState(pos);
+            if (!state.isAir()) continue;
+            boolean windCalculated = false;
+            for (var dir : Direction.values()) {
+                BlockPos sidePos = pos.offset(dir.getNormal());
+                BlockState s = level.getBlockState(sidePos);
+                if (s.isAir()) continue;
+                if (!windCalculated) {
+                    if (WindSystem.get(level).getWind(level, pos.getCenter()).length() > 5) {
+                        windCalculated = true;
+                    } else {
+                        break;
+                    }
                 }
+                Vec3 offset = new Vec3(
+                        level.random.nextDouble(),
+                        level.random.nextDouble(),
+                        level.random.nextDouble()
+                );
+                Vec3i n = dir.getNormal().multiply(-1);
+                Vec3 a = new Vec3(1 - Math.abs(dir.getNormal().getX()), 1 - Math.abs(dir.getNormal().getY()), 1 - Math.abs(dir.getNormal().getZ()));
+                Vec3 b = new Vec3(Math.max(n.getX(), 0), Math.max(n.getY(), 0), Math.max(n.getZ(), 0));
+                offset = offset.multiply(a).add(b);
+                level.addParticle(
+                        new BlockParticleOption(ParticleTypes.BLOCK, s),
+                        sidePos.getX() + offset.x,
+                        sidePos.getY() + offset.y,
+                        sidePos.getZ() + offset.z,
+                        wind.x, 10, wind.y
+                );
             }
         }
     }
+
 }
