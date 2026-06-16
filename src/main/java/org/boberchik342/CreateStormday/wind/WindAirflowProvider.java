@@ -62,7 +62,7 @@ public abstract class WindAirflowProvider implements AirflowProvider {
         Vec3 p = pos.getCenter();
         Vector3d vel = getWindVelocity().mul(-1).add(0, 1.5, 0);
         Vec3 dir = new Vec3(vel.x, vel.y, vel.z);
-        boolean hit = RaycastHelper.get(level).raycast(p, dir, level);
+        boolean hit = RaycastHelper.raycast(level, p, dir);
         return !hit;
     }
 

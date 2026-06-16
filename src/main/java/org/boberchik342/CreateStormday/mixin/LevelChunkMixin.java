@@ -31,7 +31,7 @@ public class LevelChunkMixin {
             boolean old = WindAirflowProvider.isBlockWindPassable(cir.getReturnValue());
             boolean passable = WindAirflowProvider.isBlockWindPassable(state);
             if (old != passable) {
-                RaycastHelper.get(((LevelChunk) (Object) this).getLevel()).set(pos, !passable);
+                RaycastHelper.getOctree(((LevelChunk) (Object) this).getLevel()).set(pos, !passable);
             }
         }
         WindSystem windSystem = WindSystem.get(level);

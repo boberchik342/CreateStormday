@@ -1,7 +1,6 @@
 package org.boberchik342.CreateStormday;
 
 import com.mojang.logging.LogUtils;
-import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.client.Minecraft;
@@ -91,7 +90,7 @@ public class CreateStormday {
         public static void onChunkLoad(ChunkEvent.Load event) {
             if (!(event.getChunk() instanceof LevelChunk chunk)) return;
             WindSystem.onChunkLoad(chunk);
-            RaycastHelper.get(chunk.getLevel()).loadChunk(chunk);
+            RaycastHelper.getOctree(chunk.getLevel()).loadChunk(chunk);
         }
 
         @SubscribeEvent
