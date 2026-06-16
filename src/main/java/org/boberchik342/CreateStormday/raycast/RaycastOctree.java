@@ -56,6 +56,16 @@ public class RaycastOctree {
     public void addPendingChunk(long pos) {
         pendingChunks.add(pos);
         ChunkPos cp = new ChunkPos(pos);
+        if (pendingBounds == null) {
+            pendingBounds = new Bounds();
+            pendingBounds.west = cp.x;
+            pendingBounds.east = cp.x;
+            pendingBounds.north = cp.z;
+            pendingBounds.south = cp.z;
+            pendingBounds.lower = level.getMinBuildHeight();
+            pendingBounds.upper = level.getMaxBuildHeight();
+
+        }
         pendingBounds.west = Math.min(cp.x, pendingBounds.west);
         pendingBounds.east = Math.max(cp.x, pendingBounds.east);
         pendingBounds.north = Math.min(cp.z, pendingBounds.north);
@@ -79,6 +89,8 @@ public class RaycastOctree {
             if (!pendingChunks.isEmpty()) {
                 if (pendingBounds == null) {
                     pendingBounds = new Bounds();
+                    pendingBounds.lower = level.getMinBuildHeight();
+                    pendingBounds.upper = level.getMaxBuildHeight();
                 }
 
                 ChunkPos cp = new ChunkPos(pendingChunks.iterator().nextLong());

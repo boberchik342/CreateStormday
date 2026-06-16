@@ -84,6 +84,7 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onServerPreTick(ServerTickEvent.Pre event) {
             WindSystem.tickWind(event.getServer().getAllLevels());
+            RaycastHelper.tick(false);
         }
 
         @SubscribeEvent
@@ -99,7 +100,7 @@ public class CreateStormday {
             PinwheelItemRenderer.tick();
             if (Minecraft.getInstance().level == null) return;
             WindGraphics.spawnParticles(Minecraft.getInstance());
-            RaycastHelper.tick();
+            RaycastHelper.tick(true);
         }
 
         @SubscribeEvent

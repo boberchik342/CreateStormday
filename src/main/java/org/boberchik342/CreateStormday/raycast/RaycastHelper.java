@@ -1,9 +1,12 @@
 package org.boberchik342.CreateStormday.raycast;
 
 import com.mojang.logging.LogUtils;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.List;
 import java.util.WeakHashMap;
 
 public class RaycastHelper {
@@ -19,8 +22,24 @@ public class RaycastHelper {
 
     public static int chunksLoaded = 0;
 
-    public static void tick() {
+    public static void tick(boolean isClient) {
         LogUtils.getLogger().info(String.valueOf(chunksLoaded));
         chunksLoaded = 0;
+        for (var entry : octrees.entrySet()) {
+            Player player = null;
+            if (entry.getKey().isClientSide() == isClient) {
+                Vec3 pos;
+                if (isClient) {
+                    player = Minecraft.getInstance().player;
+                } else {
+                    List<Player> players = (List<Player>) entry.getKey().players();
+                    if (!players.isEmpty()) player = players.get(entry.getKey().random.nextInt(players.size()));
+                }
+                if (player != null) {
+                    pos = player.getEyePosition();
+                    entry.getValue().loadChunkNear(pos);
+                }
+            }
+        }
     }
 }
