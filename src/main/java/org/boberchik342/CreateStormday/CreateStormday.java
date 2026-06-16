@@ -91,12 +91,7 @@ public class CreateStormday {
         public static void onChunkLoad(ChunkEvent.Load event) {
             if (!(event.getChunk() instanceof LevelChunk chunk)) return;
             WindSystem.onChunkLoad(chunk);
-            boolean debug = false;
-            if (!chunk.getLevel().isClientSide() && Sable.HELPER.isInPlotGrid(chunk.getLevel(), chunk.getPos())) {
-                LOGGER.info("aboba");
-                debug = true;
-            }
-            RaycastHelper.get(chunk.getLevel()).loadChunk(chunk, debug);
+            RaycastHelper.get(chunk.getLevel()).loadChunk(chunk);
         }
 
         @SubscribeEvent
@@ -105,6 +100,7 @@ public class CreateStormday {
             PinwheelItemRenderer.tick();
             if (Minecraft.getInstance().level == null) return;
             WindGraphics.spawnParticles(Minecraft.getInstance());
+            RaycastHelper.tick();
         }
 
         @SubscribeEvent

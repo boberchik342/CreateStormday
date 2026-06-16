@@ -1,6 +1,7 @@
 package org.boberchik342.CreateStormday.wind;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -8,6 +9,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.Config;
 
@@ -86,28 +88,34 @@ public class WindSystem {
         var system = WindSystem.get(chunk.getLevel());
         Set<BlockPos> crops = system.crops.computeIfAbsent(chunk, k -> new HashSet<>());
 
-        int minY = chunk.getMinBuildHeight();
-        int maxY = chunk.getMaxBuildHeight();
-
         ChunkPos cp = chunk.getPos();
 
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int y = minY; y < maxY; y++) {
+        LevelChunkSection[] sections = chunk.getSections();
 
-                    BlockPos pos = new BlockPos(
-                            cp.getMinBlockX() + x,
-                            y,
-                            cp.getMinBlockZ() + z
-                    );
+        for (int i = 0; i < sections.length; i++) {
+            LevelChunkSection section = sections[i];
+            if (section.hasOnlyAir()) continue;
+            if (!section.maybeHas((blockState) -> blockState.getBlock() instanceof CropBlock)) continue;
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int y = 0; y < 16; y++) {
+                        int sectionY = (chunk.getMinSection() + i) << 4;
+                        BlockPos pos = new BlockPos(
+                                cp.getMinBlockX() + x,
+                                sectionY + y,
+                                cp.getMinBlockZ() + z
+                        );
 
-                    BlockState state = chunk.getBlockState(pos);
+                        BlockState state = section.getBlockState(x, y, z);
 
-                    if (state.getBlock() instanceof CropBlock) {
-                        crops.add(pos);
+                        if (state.getBlock() instanceof CropBlock) {
+                            crops.add(pos);
+                        }
                     }
                 }
             }
         }
+
+
     }
 }
