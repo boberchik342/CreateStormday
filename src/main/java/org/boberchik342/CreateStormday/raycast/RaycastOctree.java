@@ -997,9 +997,14 @@ public class RaycastOctree {
                         int upperIndex = chunk.getSectionIndex(nodeInfo.bounds.upper);
                         if (lowerIndex == upperIndex) {
                             checkedSection = 1;
-                            if (sections[lowerIndex].hasOnlyAir()) {
+                            if (sections[lowerIndex].hasOnlyAir() || !sections[lowerIndex].maybeHas(state -> !WindAirflowProvider.isBlockWindPassable(state))) {
                                 deleteDescendants(nodeInfo.id);
                                 data.set(nodeInfo.id, -1);
+                                if (!trace.isEmpty()) trace.peek().childrenModified = true;
+                                continue;
+                            } else if (!sections[lowerIndex].maybeHas(WindAirflowProvider::isBlockWindPassable)) {
+                                deleteDescendants(nodeInfo.id);
+                                data.set(nodeInfo.id, -2);
                                 if (!trace.isEmpty()) trace.peek().childrenModified = true;
                                 continue;
                             }
@@ -1036,6 +1041,23 @@ public class RaycastOctree {
             if (element.childrenModified && tryCollapse(element.id) && !trace.isEmpty()) {
                 trace.peek().childrenModified = true;
             }
+        }
+    }
+
+    public void loadChunkNear(Vec3 pos) {
+        if (pendingChunks.isEmpty()) return;
+        double bestDistance = Double.POSITIVE_INFINITY;
+        long bestChunk = 0;
+        for (var chunk : pendingChunks) {
+            ChunkPos cp = new ChunkPos(chunk);
+            double d = pos.distanceTo(cp.getMiddleBlockPosition((int) pos.y).getCenter());
+            if (d < bestDistance) {
+                bestDistance = d;
+                bestChunk = chunk;
+            }
+        }
+        if (bestDistance != Double.POSITIVE_INFINITY) {
+            loadChunkFull(bestChunk);
         }
     }
 }
