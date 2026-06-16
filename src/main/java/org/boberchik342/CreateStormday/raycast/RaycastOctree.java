@@ -158,7 +158,6 @@ public class RaycastOctree {
             blockPos.set(info.blockPos);
             pos = info.position;
         }
-//        LogUtils.getLogger().info("SONION 618");
         ChunkPos cp = new ChunkPos(blockPos);
         int xBound = direction.x > 0 ? cp.getMaxBlockX() + 1 : cp.getMinBlockX();
         int zBound = direction.z > 0 ? cp.getMaxBlockZ() + 1 : cp.getMinBlockZ();
@@ -167,7 +166,6 @@ public class RaycastOctree {
                 cp.x >= chunksBounds.west && cp.x <= chunksBounds.east &&
                 cp.z >= chunksBounds.north && cp.z <= chunksBounds.south
         ) {
-//            LogUtils.getLogger().info("SON 618");
             if (pendingChunks.contains(cp.toLong())) {
                 loadChunkFull(cp.toLong());
             }
@@ -471,14 +469,14 @@ public class RaycastOctree {
                 cb.upper = b.upper;
                 cb.lower = b.lower;
                 loadPendingChunksAlongRay(pos, direction, cb);
-                if (raycastInBounds(transformedPos, transformedDir, b, false)) return true;
+                if (raycastInBounds(transformedPos, transformedDir, b)) return true;
             }
         }
         loadPendingChunksAlongRay(pos, direction, getPendingBounds());
-        return raycastInBounds(pos, direction, getBounds(), true);
+        return raycastInBounds(pos, direction, getBounds());
     }
 
-    private boolean raycastInBounds(Vec3 pos, Vec3 direction, Bounds bounds, boolean loadOutsideBounds) {
+    private boolean raycastInBounds(Vec3 pos, Vec3 direction, Bounds bounds) {
         BlockPos blockPos = BlockPos.containing(pos.x, pos.y, pos.z);
         if (!bounds.contains(blockPos)) {
             HitInfo info = bounds.getRayEntry(pos, direction);
@@ -495,7 +493,7 @@ public class RaycastOctree {
             if (info == null) break;
             Bounds nodeBounds = info.bounds;
             if (data.getInt(info.id) == -2) return true;
-            HitInfo hitInfo = nodeBounds.getRayExit(pos, blockPos, direction);
+            HitInfo hitInfo = nodeBounds.getRayExit(pos, direction);
             blockPos = hitInfo.blockPos;
             pos = hitInfo.position;
         }
@@ -714,7 +712,7 @@ public class RaycastOctree {
             return new HitInfo(intersectionSide, pos, blockPos);
         }
 
-        public HitInfo getRayExit(Vec3 pos, BlockPos blockPos, Vec3 direction) {
+        public HitInfo getRayExit(Vec3 pos, Vec3 direction) {
             int xBound = (direction.x > 0 ? east + 1 : west);
             int yBound = (direction.y > 0 ? upper + 1 : lower);
             int zBound = (direction.z > 0 ? south + 1 : north);
@@ -722,6 +720,7 @@ public class RaycastOctree {
             double b = direction.y == 0 ? Double.POSITIVE_INFINITY : (yBound - pos.y) / direction.y;
             double c = direction.z == 0 ? Double.POSITIVE_INFINITY : (zBound - pos.z) / direction.z;
             Direction dir;
+            BlockPos blockPos;
             if (a < b && a < c) {
                 pos = pos.add(direction.multiply(a, a, a));
                 pos = new Vec3(xBound, pos.y, pos.z);
