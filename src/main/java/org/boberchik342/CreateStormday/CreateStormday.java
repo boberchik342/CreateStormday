@@ -1,10 +1,8 @@
 package org.boberchik342.CreateStormday;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.logging.LogUtils;
 import dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension;
 import dev.ryanhcode.sable.sublevel.SubLevel;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.client.resources.model.ModelResourceLocation;
@@ -25,7 +23,6 @@ import net.neoforged.neoforge.client.event.*;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.common.util.Lazy;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
@@ -35,18 +32,14 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.boberchik342.CreateStormday.all.AllBlockEntities;
 import org.boberchik342.CreateStormday.all.AllBlocks;
 import org.boberchik342.CreateStormday.all.AllItems;
-import org.boberchik342.CreateStormday.debug.RaycastDebugCommand;
 import org.boberchik342.CreateStormday.debug.WindDebugRenderer;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelBlockEntityRenderer;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelItemExtensions;
 import org.boberchik342.CreateStormday.pinwheel.PinwheelItemRenderer;
 import org.boberchik342.CreateStormday.raycast.RaycastHelper;
-import org.boberchik342.CreateStormday.raycast.RaycastOctree;
 import org.boberchik342.CreateStormday.wind.*;
-import org.jetbrains.annotations.Debug;
 import org.joml.RoundingMode;
 import org.joml.Vector3i;
-import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 
 @Mod(CreateStormday.MODID)
@@ -54,23 +47,10 @@ public class CreateStormday {
     public static final String MODID = "create_stormday";
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public static final Lazy<KeyMapping> SWITCH_RAYCAST_MODE_MAPPING = Lazy.of(() -> new KeyMapping(
-            "key.create_stormday.switch_raycast_mode", // Will be localized using this translation key
-            InputConstants.Type.KEYSYM, // Default mapping is on the keyboard
-            GLFW.GLFW_KEY_P, // Default key is P
-            "key.categories.misc" // Mapping will be in the misc category
-    ));
-
-    @SubscribeEvent // on the mod event bus only on the physical client
-    public void registerBindings(RegisterKeyMappingsEvent event) {
-        event.register(SWITCH_RAYCAST_MODE_MAPPING.get());
-    }
-
     public CreateStormday(IEventBus modEventBus, ModContainer modContainer) {
         AllBlocks.BLOCKS.register(modEventBus);
         AllBlockEntities.BLOCK_ENTITIES.register(modEventBus);
         AllItems.ITEMS.register(modEventBus);
-        modEventBus.register(this);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         modContainer.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
@@ -84,7 +64,6 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onCommonSetup(FMLCommonSetupEvent event) {
             LOGGER.info("Wind breaks crops: {}", Config.windBreaksCrops);
-            RaycastOctree.test();
         }
 
         @SubscribeEvent
@@ -102,27 +81,20 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onServerPreTick(ServerTickEvent.Pre event) {
             WindSystem.tickWind(event.getServer().getAllLevels());
-            RaycastHelper.tick(false);
         }
 
         @SubscribeEvent
         public static void onChunkLoad(ChunkEvent.Load event) {
             if (!(event.getChunk() instanceof LevelChunk chunk)) return;
             WindSystem.onChunkLoad(chunk);
-            RaycastHelper.getOctree(chunk.getLevel()).loadChunk(chunk);
         }
 
         @SubscribeEvent
         public static void onClientTick(ClientTickEvent.Post event) {
-            while (SWITCH_RAYCAST_MODE_MAPPING.get().consumeClick()) {
-                RaycastHelper.octreeLess ^= true;
-                LogUtils.getLogger().info(String.valueOf(RaycastHelper.octreeLess));
-            }
             if (Minecraft.getInstance().isPaused()) return;
             PinwheelItemRenderer.tick();
             if (Minecraft.getInstance().level == null) return;
             WindGraphics.spawnParticles(Minecraft.getInstance());
-            RaycastHelper.tick(true);
         }
 
         @SubscribeEvent
@@ -145,7 +117,6 @@ public class CreateStormday {
         @SubscribeEvent
         public static void onRegisterCommands(RegisterCommandsEvent event) {
             WindCommand.register(event.getDispatcher());
-            RaycastDebugCommand.register(event.getDispatcher());
         }
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {

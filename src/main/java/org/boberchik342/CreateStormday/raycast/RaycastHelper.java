@@ -1,6 +1,5 @@
 package org.boberchik342.CreateStormday.raycast;
 
-import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -9,37 +8,8 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.wind.WindAirflowProvider;
 
-import java.util.Map;
-import java.util.WeakHashMap;
-
 public class RaycastHelper {
-    public static boolean octreeLess = false;
-    private static final Map<Level, RaycastOctree> clientOctrees = new WeakHashMap<>();
-    private static final Map<Level, RaycastOctree> serverOctrees = new WeakHashMap<>();
-
-    public static RaycastOctree getOctree(Level level) {
-        return getOctreeMap(level.isClientSide).computeIfAbsent(level, k -> new RaycastOctree(level));
-    }
-
-    private static Map<Level, RaycastOctree>  getOctreeMap(boolean isClient) {
-        return isClient ? clientOctrees : serverOctrees;
-    }
-
     public static boolean raycast(Level level, Vec3 pos, Vec3 direction) {
-        if (octreeLess) {
-            return octreeLessRaycast(level, pos, direction);
-        }
-        return getOctree(level).raycast(pos, direction, level);
-    }
-
-    public static void tick(boolean isClient) {
-        if (octreeLess) return;
-        for (var entry : getOctreeMap(isClient).entrySet()) {
-            entry.getValue().tick();
-        }
-    }
-
-    public static boolean octreeLessRaycast(Level level, Vec3 pos, Vec3 direction) {
         BlockPos.MutableBlockPos blockPos = BlockPos.containing(pos).mutable();
         ChunkPos chunkPos = null;
         LevelChunk chunk = null;
