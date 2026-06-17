@@ -6,10 +6,13 @@ import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -21,6 +24,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 public class RaycastOctree {
+    public int chunkLoadBudget = 2;
     public static boolean frozen = false;
     private int sizePower = 0;
     private BlockPos origin = new BlockPos(0, 0, 0);
@@ -31,6 +35,7 @@ public class RaycastOctree {
     Level level;
 
     LongOpenHashSet pendingChunks = new LongOpenHashSet();
+    LongOpenHashSet chunksToLoad = new LongOpenHashSet();
 
     private static class NodeInfo {
         public NodeInfo(int id, Bounds bounds, int depth) {
@@ -49,7 +54,7 @@ public class RaycastOctree {
         this.level = level;
         if (level != null) {
             pendingBounds.lower = level.getMinBuildHeight();
-            pendingBounds.upper = level.getMaxBuildHeight();
+            pendingBounds.upper = level.getMaxBuildHeight() - 1;
         }
     }
 
@@ -62,14 +67,19 @@ public class RaycastOctree {
             pendingBounds.east = cp.x;
             pendingBounds.north = cp.z;
             pendingBounds.south = cp.z;
-            pendingBounds.lower = level.getMinBuildHeight();
-            pendingBounds.upper = level.getMaxBuildHeight();
+            pendingBounds.lower = level.getMinBuildHeight() - 1;
+            pendingBounds.upper = level.getMaxBuildHeight() - 1;
 
         }
         pendingBounds.west = Math.min(cp.x, pendingBounds.west);
         pendingBounds.east = Math.max(cp.x, pendingBounds.east);
         pendingBounds.north = Math.min(cp.z, pendingBounds.north);
         pendingBounds.south = Math.max(cp.z, pendingBounds.south);
+    }
+
+    public void addChunkToLoad(long pos) {
+        addPendingChunk(pos);
+        chunksToLoad.add(pos);
     }
 
     public void removePendingChunk(long pos) {
@@ -81,6 +91,7 @@ public class RaycastOctree {
         ) {
             pendingBoundsShouldShrink = true;
         }
+        chunksToLoad.remove(pos);
     }
 
     private Bounds getPendingBounds() {
@@ -90,7 +101,7 @@ public class RaycastOctree {
                 if (pendingBounds == null) {
                     pendingBounds = new Bounds();
                     pendingBounds.lower = level.getMinBuildHeight();
-                    pendingBounds.upper = level.getMaxBuildHeight();
+                    pendingBounds.upper = level.getMaxBuildHeight() - 1;
                 }
 
                 ChunkPos cp = new ChunkPos(pendingChunks.iterator().nextLong());
@@ -157,8 +168,8 @@ public class RaycastOctree {
         }
     }
 
-    private void loadPendingChunksAlongRay(Vec3 pos, Vec3 direction, Bounds chunksBounds) {
-        if (chunksBounds == null) return;
+    private boolean loadPendingChunksAlongRay(Vec3 pos, Vec3 direction, Bounds chunksBounds) {
+        if (chunksBounds == null) return true;
 
         Bounds bounds = chunkToBlockBounds(chunksBounds);
 
@@ -166,11 +177,12 @@ public class RaycastOctree {
 
         if (!bounds.contains(blockPos)) {
             HitInfo info = bounds.getRayEntry(pos, direction);
-            if (info == null) return;
+            if (info == null) return true;
             blockPos.set(info.blockPos);
             pos = info.position;
         }
         ChunkPos cp = new ChunkPos(blockPos);
+        LongArrayList rayChunks = new LongArrayList();
         int xBound = direction.x > 0 ? cp.getMaxBlockX() + 1 : cp.getMinBlockX();
         int zBound = direction.z > 0 ? cp.getMaxBlockZ() + 1 : cp.getMinBlockZ();
         int yBound = direction.y > 0 ? bounds.upper + 1 : bounds.lower;
@@ -179,7 +191,7 @@ public class RaycastOctree {
                 cp.z >= chunksBounds.north && cp.z <= chunksBounds.south
         ) {
             if (pendingChunks.contains(cp.toLong())) {
-                loadChunkFull(cp.toLong());
+                rayChunks.add(cp.toLong());
             }
             double x = direction.x == 0 ? Double.POSITIVE_INFINITY : (xBound - pos.x) / direction.x;
             double y = direction.y == 0 ? Double.POSITIVE_INFINITY : (yBound - pos.y) / direction.y;
@@ -192,10 +204,20 @@ public class RaycastOctree {
                 blockPos.setZ(direction.z > 0 ? cp.getMaxBlockZ() + 1 : cp.getMinBlockZ() - 1);
             } else {
                 // escaped bounds vertically
-                return;
+                break;
             }
             cp = new ChunkPos(blockPos);
         }
+        if (rayChunks.size() <= chunkLoadBudget) {
+            for (var c : rayChunks) {
+                loadChunkFull(c);
+            }
+            return true;
+        }
+        for (var c : rayChunks) {
+            addChunkToLoad(c);
+        }
+        return false;
     }
 
     private static Bounds chunkToBlockBounds(Bounds chunksBounds) {
@@ -480,12 +502,15 @@ public class RaycastOctree {
                 cb.south = b.south >> 4;
                 cb.upper = b.upper;
                 cb.lower = b.lower;
-                loadPendingChunksAlongRay(pos, direction, cb);
-                if (raycastInBounds(transformedPos, transformedDir, b)) return true;
+                if (loadPendingChunksAlongRay(pos, direction, cb)) {
+                    if (raycastInBounds(transformedPos, transformedDir, b)) return true;
+                }
             }
         }
-        loadPendingChunksAlongRay(pos, direction, getPendingBounds());
-        return raycastInBounds(pos, direction, getBounds());
+        if (loadPendingChunksAlongRay(pos, direction, getPendingBounds())) {
+            return raycastInBounds(pos, direction, getBounds());
+        }
+        return RaycastHelper.octreeLessRaycast(level, pos, direction);
     }
 
     private boolean raycastInBounds(Vec3 pos, Vec3 direction, Bounds bounds) {
@@ -949,18 +974,17 @@ public class RaycastOctree {
     private void loadChunkFull(long p) {
         ChunkPos cp = new ChunkPos(p);
 
+        chunkLoadBudget--;
         removePendingChunk(cp.toLong());
 
 //        LogUtils.getLogger().info("loaded chunk");
 
         if (!level.hasChunk(cp.x, cp.z)) return;
 
-        RaycastHelper.chunksLoaded++;
-
         LevelChunk chunk = level.getChunk(cp.x, cp.z);
 
         BlockPos a = new BlockPos(cp.getMinBlockX(), chunk.getMinBuildHeight(), cp.getMinBlockZ());
-        BlockPos b = new BlockPos(cp.getMaxBlockX(), chunk.getMaxBuildHeight(), cp.getMaxBlockZ());
+        BlockPos b = new BlockPos(cp.getMaxBlockX(), chunk.getMaxBuildHeight() - 1, cp.getMaxBlockZ());
 
         expandToContain(a);
         expandToContain(b);
@@ -1055,8 +1079,8 @@ public class RaycastOctree {
         }
     }
 
-    public void loadChunkNear(Vec3 pos) {
-        if (pendingChunks.isEmpty()) return;
+    public boolean loadChunkNear(Vec3 pos) {
+        if (pendingChunks.isEmpty()) return false;
         double bestDistance = Double.POSITIVE_INFINITY;
         long bestChunk = 0;
         for (var chunk : pendingChunks) {
@@ -1069,6 +1093,29 @@ public class RaycastOctree {
         }
         if (bestDistance != Double.POSITIVE_INFINITY) {
             loadChunkFull(bestChunk);
+            return true;
         }
+        return false;
+    }
+
+    public void tick() {
+        for (var chunkP : chunksToLoad.toLongArray()) {
+            if (chunkLoadBudget <= 0) return;
+            loadChunkFull(chunkP);
+        }
+        while (chunkLoadBudget > 0) {
+            Player player = null;
+            Vec3 pos;
+            if (level.isClientSide) {
+                player = Minecraft.getInstance().player;
+            } else {
+                List<Player> players = (List<Player>) level.players();
+                if (!players.isEmpty()) player = players.get(level.random.nextInt(players.size()));
+            }
+            if (player == null || !loadChunkNear(player.getEyePosition())) {
+                break;
+            }
+        }
+        chunkLoadBudget = 2;
     }
 }

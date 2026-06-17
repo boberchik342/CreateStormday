@@ -19,7 +19,7 @@ public class RaycastDebugCommand {
                         RaycastOctree.frozen = true;
                         for (int x = cp.getMinBlockX(); x <= cp.getMaxBlockX(); x++) {
                             for (int z = cp.getMinBlockZ(); z <= cp.getMaxBlockZ(); z++) {
-                                for (int y = ctx.getSource().getLevel().getMinBuildHeight(); y <= ctx.getSource().getLevel().getMaxBuildHeight(); y++) {
+                                for (int y = ctx.getSource().getLevel().getMinBuildHeight(); y < ctx.getSource().getLevel().getMaxBuildHeight(); y++) {
                                     ctx.getSource().getLevel().setBlock(
                                             new BlockPos(x, y, z),
                                             RaycastHelper.getOctree(ctx.getSource().getLevel()).get(new BlockPos(x, y, z)) == -2 ? Blocks.RED_WOOL.defaultBlockState() : Blocks.AIR.defaultBlockState()
