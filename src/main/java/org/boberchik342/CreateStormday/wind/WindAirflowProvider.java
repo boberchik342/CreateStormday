@@ -25,6 +25,8 @@ public abstract class WindAirflowProvider implements AirflowProvider {
 
     protected float strength = 0;
     protected float direction = 0;
+    private static final int CACHE_TTL = 0;
+    private static final int RANDOM_TTL_MULTIPLIER = 0;
 
     private static double interpolate(double a, double b, double t) {
         return a * (1 - t) + b * t;
@@ -60,9 +62,9 @@ public abstract class WindAirflowProvider implements AirflowProvider {
 
     public boolean computeDirectWindExposure(Level level, BlockPos pos) {
         Vec3 p = pos.getCenter();
-        Vector3d vel = getWindVelocity().mul(-1).add(0, 1.5, 0);
+        Vector3d vel = getWindVelocity().mul(-1).add(0, 5, 0);
         Vec3 dir = new Vec3(vel.x, vel.y, vel.z);
-        boolean hit = RaycastHelper.get(level).raycast(p, dir, level);
+        boolean hit = RaycastHelper.raycast(level, p, dir);
         return !hit;
     }
 
@@ -71,13 +73,13 @@ public abstract class WindAirflowProvider implements AirflowProvider {
             Map<BlockPos, WindSystem.CacheEntry<Boolean>> directExposure = directWindExposureCache.get((LevelChunk) level.getChunk(pos));
             if (directExposure != null) {
                 WindSystem.CacheEntry<Boolean> exposed = directExposure.get(pos);
-                if (exposed != null && level.getGameTime() - exposed.created < 40) {
+                if (exposed != null && level.getGameTime() - exposed.created < CACHE_TTL) {
                     return exposed;
                 }
             }
         }
         boolean hit = computeDirectWindExposure(level, pos);
-        WindSystem.CacheEntry<Boolean> entry = new WindSystem.CacheEntry<>(level.getGameTime() + (pos.hashCode() & 7), hit);
+        WindSystem.CacheEntry<Boolean> entry = new WindSystem.CacheEntry<>(level.getGameTime() + (pos.hashCode() & 7) * RANDOM_TTL_MULTIPLIER, hit);
         if (level.isLoaded(pos)) {
             Map<BlockPos, WindSystem.CacheEntry<Boolean>> directExposure = directWindExposureCache.computeIfAbsent((LevelChunk) level.getChunk(pos), k -> new HashMap<>());
             directExposure.put(pos, entry);
@@ -94,7 +96,7 @@ public abstract class WindAirflowProvider implements AirflowProvider {
             Map<BlockPos, WindSystem.CacheEntry<Double>> directExposure = interpolatedWindExposureCache.get((LevelChunk) level.getChunk(pos));
             if (directExposure != null) {
                 WindSystem.CacheEntry<Double> exposed = directExposure.get(pos);
-                if (exposed != null && level.getGameTime() - exposed.created < 40) {
+                if (exposed != null && level.getGameTime() - exposed.created < CACHE_TTL) {
                     return exposed;
                 }
             }

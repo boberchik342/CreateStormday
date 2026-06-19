@@ -1,8 +1,9 @@
 package org.boberchik342.CreateStormday.wind;
 
-import com.google.common.collect.MapMaker;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
@@ -13,14 +14,11 @@ import net.minecraft.world.phys.Vec3;
 import org.boberchik342.CreateStormday.Config;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class WindSystem {
     public static long windComputeTime;
     public WindAirflowProvider windProvider;
     private final List<AirflowProvider> airflowProviders = new ArrayList<>();
-    private transient Iterator<Set<BlockPos>> cropSetIterator = null;
-    private transient Iterator<BlockPos> posIterator = null;
 
     public static class CacheEntry<T> {
         public CacheEntry(long created, T value) {
@@ -42,7 +40,7 @@ public class WindSystem {
         return new WindSystem(level);
     }
 
-    public final Map<LevelChunk, Set<BlockPos>> crops = new MapMaker().weakKeys().makeMap();
+    public final WeakHashMap<LevelChunk, Set<BlockPos>> crops = new WeakHashMap<>();
 
     public WindSystem(Level level) {
         windSystems.put(level, this);
@@ -73,45 +71,14 @@ public class WindSystem {
                 serverWind.tick(level);
             }
             if (system.getMaxWind() > 10 && Config.windBreaksCrops) {
-                if (system.crops.isEmpty()) {
-                    continue;
+                List<BlockPos> snapshot = new ArrayList<>();
+
+                for (Set<BlockPos> set : system.crops.values()) {
+                    snapshot.addAll(set);
                 }
-
-                if (system.posIterator == null || !system.posIterator.hasNext()) {
-                    if (system.cropSetIterator == null || !system.cropSetIterator.hasNext()) {
-                        system.cropSetIterator = system.crops.values().iterator();
-                    }
-
-                    while (system.cropSetIterator.hasNext()) {
-                        Set<BlockPos> nextSet = system.cropSetIterator.next();
-                        if (nextSet != null && !nextSet.isEmpty()) {
-                            system.posIterator = nextSet.iterator();
-                            break;
-                        }
-                    }
-                }
-
-                if (system.posIterator != null && system.posIterator.hasNext()) {
-                    int cropsToProcess = 1;
-                    for (int i = 0; i < cropsToProcess && system.posIterator.hasNext(); i++) {
-                        BlockPos pos = system.posIterator.next();
-
-                        if (!level.isLoaded(pos)) {
-                            continue;
-                        }
-
-                        BlockState state = level.getBlockState(pos);
-
-                        if (!(state.getBlock() instanceof CropBlock)) {
-                            system.posIterator.remove();
-                            continue;
-                        }
-
-                        if (system.getWind(level, pos.getCenter()).lengthSqr() > 100) {
-                            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-                            system.posIterator.remove();
-                        }
-                    }
+                for (var pos : snapshot) {
+                    if (system.getWind(level, pos.getCenter()).length() <= 10) continue;
+                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
                 }
             }
         }
@@ -119,32 +86,36 @@ public class WindSystem {
 
     public static void onChunkLoad(LevelChunk chunk) {
         var system = WindSystem.get(chunk.getLevel());
-        Set<BlockPos> crops = system.crops.computeIfAbsent(chunk, k -> Collections.newSetFromMap(new ConcurrentHashMap<>()));
-        crops.clear();
+        Set<BlockPos> crops = system.crops.computeIfAbsent(chunk, k -> new HashSet<>());
 
-        int chunkMinX = chunk.getPos().getMinBlockX();
-        int chunkMinZ = chunk.getPos().getMinBlockZ();
+        ChunkPos cp = chunk.getPos();
+
         LevelChunkSection[] sections = chunk.getSections();
 
         for (int i = 0; i < sections.length; i++) {
             LevelChunkSection section = sections[i];
-            if (section == null || section.hasOnlyAir() || !section.maybeHas(state -> state.getBlock() instanceof CropBlock)) {
-                continue;
-            }
+            if (section.hasOnlyAir()) continue;
+            if (!section.maybeHas((blockState) -> blockState.getBlock() instanceof CropBlock)) continue;
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int y = 0; y < 16; y++) {
+                        int sectionY = (chunk.getMinSection() + i) << 4;
+                        BlockPos pos = new BlockPos(
+                                cp.getMinBlockX() + x,
+                                sectionY + y,
+                                cp.getMinBlockZ() + z
+                        );
 
-            int sectionBaseY = chunk.getSectionYFromSectionIndex(i) * 16;
+                        BlockState state = section.getBlockState(x, y, z);
 
-            for (int yOffset = 0; yOffset < 16; yOffset++) {
-                for (int x = 0; x < 16; x++) {
-                    for (int z = 0; z < 16; z++) {
-                        BlockState state = section.getBlockState(x, yOffset, z);
                         if (state.getBlock() instanceof CropBlock) {
-                            BlockPos pos = new BlockPos(chunkMinX + x, sectionBaseY + yOffset, chunkMinZ + z);
                             crops.add(pos);
                         }
                     }
                 }
             }
         }
+
+
     }
 }
